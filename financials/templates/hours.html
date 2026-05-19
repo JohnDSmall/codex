@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Hours{% endblock %}
+{% block body %}
+<h1>Hours</h1>
+
+<div class="filter-bar">
+  <a href="{{ url_for('hours') }}" class="pill {% if not active_tag %}active{% endif %}">All</a>
+  {% for t in tags %}
+    <a href="{{ url_for('hours', tag=t.id) }}" class="pill {% if active_tag == t.id %}active{% endif %}">{{ t.name }}</a>
+  {% endfor %}
+  <span class="total">Total: <strong>{{ '%.1f' % total_hours }} hrs</strong> / <strong class="pos">{{ total_value|money }}</strong></span>
+</div>
+
+<details class="add-form">
+  <summary>+ Log hours</summary>
+  <form method="post" action="{{ url_for('add_hours') }}">
+    <input type="date" name="date" value="{{ today }}" required>
+    <input type="number" step="0.25" name="hours" placeholder="Hours" required>
+    <input type="number" step="0.01" name="rate" placeholder="Rate (optional)">
+    <select name="pay_status">
+      <option value="NA">NA</option>
+      <option value="Pending">Pending</option>
+      <option value="Paid">Paid</option>
+    </select>
+    <input type="text" name="client" placeholder="Client">
+    <input type="text" name="project" placeholder="Project">
+    <input type="text" name="description" placeholder="Description">
+    <select name="tag_id" required>
+      {% for t in tags %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">Add</button>
+  </form>
+</details>
+
+<table>
+  <thead>
+    <tr><th>Date</th><th>Client</th><th>Project</th><th>Description</th><th>Tag</th><th>Status</th><th class="right">Hours</th><th class="right">Rate</th><th class="right">Value</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for h in rows %}
+    <tr>
+      <td>{{ h.date }}</td>
+      <td>{{ h.client or '' }}</td>
+      <td>{{ h.project or '' }}</td>
+      <td>{{ h.description or '' }}</td>
+      <td><span class="tag">{{ h.tag_name }}</span></td>
+      <td>{{ h.pay_status or '' }}</td>
+      <td class="right">{{ '%.2f' % h.hours }}</td>
+      <td class="right">{{ h.rate|money if h.rate else '' }}</td>
+      <td class="right">{{ ((h.hours or 0) * (h.rate or 0))|money if h.rate else '' }}</td>
+      <td>
+        <form method="post" action="{{ url_for('delete_hours', hid=h.id) }}" style="display:inline">
+          <button type="submit" class="del">×</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}Financials{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<nav>
+  <div class="brand">Financials</div>
+  <a href="{{ url_for('dashboard') }}">Dashboard</a>
+  <a href="{{ url_for('expenses') }}">Expenses</a>
+  <a href="{{ url_for('income') }}">Income</a>
+  <a href="{{ url_for('assets') }}">Assets</a>
+  <a href="{{ url_for('hours') }}">Hours</a>
+</nav>
+<main>
+{% block body %}{% endblock %}
+</main>
+</body>
+</html>

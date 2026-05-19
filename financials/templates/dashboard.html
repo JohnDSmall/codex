@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+<h1>Dashboard</h1>
+
+<section class="cards">
+{% for r in totals_by_tag %}
+  <div class="card">
+    <h3>{{ r.tag }}</h3>
+    <div class="row"><span>Income</span><strong class="pos">{{ r.income|money }}</strong></div>
+    <div class="row"><span>Expenses</span><strong class="neg">{{ r.expenses|money }}</strong></div>
+    <div class="row net"><span>Net</span><strong>{{ (r.income - r.expenses)|money }}</strong></div>
+  </div>
+{% endfor %}
+</section>
+
+<section>
+  <h2>Assets — {{ assets_total|money }}</h2>
+  <table>
+    <thead><tr><th>Tag</th><th class="right">Value</th></tr></thead>
+    <tbody>
+    {% for r in assets_by_tag %}
+      <tr><td>{{ r.tag }}</td><td class="right">{{ r.v|money }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Monthly breakdown</h2>
+  <table class="dense">
+    <thead>
+      <tr>
+        <th>Month</th>
+        {% for t in tag_names %}<th colspan="2">{{ t }}</th>{% endfor %}
+      </tr>
+      <tr>
+        <th></th>
+        {% for t in tag_names %}<th class="right">In</th><th class="right">Out</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in months %}
+      <tr>
+        <td>{{ m }}</td>
+        {% for t in tag_names %}
+          <td class="right pos">{{ grid[m]['income'][t]|money if grid[m]['income'][t] else '' }}</td>
+          <td class="right neg">{{ grid[m]['expenses'][t]|money if grid[m]['expenses'][t] else '' }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="two-col">
+  <div>
+    <h2>Recent expenses</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th>Tag</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+      {% for e in recent_exp %}
+        <tr>
+          <td>{{ e.date }}</td>
+          <td>{{ e.description }}</td>
+          <td><span class="tag">{{ e.tag_name }}</span></td>
+          <td class="right neg">{{ e.amount|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <h2>Recent income</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th>Tag</th><th class="right">Amount</th></tr></thead>
+      <tbody>
+      {% for i in recent_inc %}
+        <tr>
+          <td>{{ i.date }}</td>
+          <td>{{ i.description }}</td>
+          <td><span class="tag">{{ i.tag_name }}</span></td>
+          <td class="right pos">{{ i.amount|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
