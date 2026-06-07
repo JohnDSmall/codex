@@ -175,6 +175,151 @@ def dashboard():
     )
 
 
+def _cv(values):
+    if len(values) < 2:
+        return 0.0
+    mean = sum(values) / len(values)
+    if mean == 0:
+        return 0.0
+    var = sum((v - mean) ** 2 for v in values) / len(values)
+    return (var ** 0.5) / abs(mean)
+
+
+def _classify_subscription(date_strs, amounts):
+    """Decide whether a merchant looks like a recurring subscription/bill
+    rather than a series of independent purchases.
+
+    Subscription = amount is stable (CV ≤ 0.20) AND cadence is regular
+    (gap CV ≤ 0.60). Otherwise return (None, 0).
+
+    Returns (cadence_label, monthly_factor).
+    """
+    from datetime import date as _date
+    dates = sorted(_date.fromisoformat(d) for d in date_strs)
+    if len(dates) < 2:
+        return None, 0.0
+    gaps = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
+
+    if _cv(amounts) > 0.20:
+        return None, 0.0  # amount varies too much — frequent purchases, not a subscription
+    if _cv(gaps) > 0.60:
+        return None, 0.0  # cadence is irregular — one-off events, not a recurring bill
+
+    sorted_gaps = sorted(gaps)
+    median = sorted_gaps[len(sorted_gaps) // 2]
+    if median <= 10:
+        return "Weekly", 30.44 / 7
+    if 11 <= median <= 20:
+        return "Bi-weekly", 30.44 / 14
+    if 21 <= median <= 45:
+        return "Monthly", 1.0
+    if 46 <= median <= 75:
+        return "~6-weekly", 30.44 / median
+    if 76 <= median <= 120:
+        return "Quarterly", 1.0 / 3
+    if 121 <= median <= 200:
+        return "Semi-annual", 1.0 / 6
+    if 300 <= median <= 400:
+        return "Annual", 1.0 / 12
+    return None, 0.0
+
+
+def _is_active(cadence, last_date_iso):
+    today = date.today()
+    last = date.fromisoformat(last_date_iso)
+    gap = (today - last).days
+    thresholds = {
+        "Weekly": 21,
+        "Bi-weekly": 35,
+        "Monthly": 50,
+        "~6-weekly": 90,
+        "Quarterly": 120,
+        "Semi-annual": 220,
+        "Annual": 420,
+    }
+    return gap <= thresholds.get(cadence, 90)
+
+
+@app.route("/subscriptions")
+def subscriptions():
+    f = _filters_from_request()
+    # Subscriptions inherently span the user's whole history — always use
+    # all-time unless the user explicitly set a date range in the URL.
+    if "from" not in request.args and "to" not in request.args:
+        f["from_date"] = None
+        f["to_date"] = None
+    active_only = request.args.get("active", "1") != "0"
+
+    conn = get_conn()
+    where, params = _where_clause(f, "e")
+
+    # Group: prefer normalized merchant, fall back to description. Require
+    # at least 3 occurrences across at least 2 distinct months to qualify.
+    rows = conn.execute(
+        f"""SELECT COALESCE(NULLIF(e.merchant, ''), e.description) AS merchant,
+                   COUNT(*) AS n,
+                   COUNT(DISTINCT substr(e.date, 1, 7)) AS month_count,
+                   MIN(e.date) AS first_date,
+                   MAX(e.date) AS last_date,
+                   ROUND(AVG(e.amount), 2) AS avg_amount,
+                   ROUND(SUM(e.amount), 2) AS total,
+                   GROUP_CONCAT(e.date) AS dates,
+                   GROUP_CONCAT(e.amount) AS amounts,
+                   GROUP_CONCAT(DISTINCT COALESCE(c.name, '')) AS cat_names,
+                   GROUP_CONCAT(DISTINCT COALESCE(e.card, 'manual')) AS card_names
+            FROM expenses e
+            LEFT JOIN categories c ON c.id = e.category_id
+            {where}
+            GROUP BY merchant
+            HAVING n >= 3 AND month_count >= 2
+            ORDER BY total DESC""",
+        params,
+    ).fetchall()
+
+    subs = []
+    total_monthly = 0.0
+    for r in rows:
+        amounts = [float(a) for a in r["amounts"].split(",")]
+        cadence, factor = _classify_subscription(r["dates"].split(","), amounts)
+        if cadence is None:
+            continue
+        last_iso = r["last_date"]
+        active = _is_active(cadence, last_iso)
+        if active_only and not active:
+            continue
+        monthly_cost = (r["avg_amount"] or 0) * factor
+        total_monthly += monthly_cost
+        subs.append({
+            "merchant": r["merchant"],
+            "n": r["n"],
+            "cadence": cadence,
+            "avg_amount": r["avg_amount"],
+            "monthly_cost": monthly_cost,
+            "annual_cost": monthly_cost * 12,
+            "total": r["total"],
+            "first_date": r["first_date"],
+            "last_date": r["last_date"],
+            "active": active,
+            "categories": r["cat_names"] or "",
+            "cards": r["card_names"] or "",
+        })
+
+    subs.sort(key=lambda s: s["monthly_cost"], reverse=True)
+    cards = _distinct_cards(conn)
+    conn.close()
+
+    return render_template(
+        "subscriptions.html",
+        subs=subs,
+        total_monthly=total_monthly,
+        total_annual=total_monthly * 12,
+        active_only=active_only,
+        filters=f,
+        cards=cards,
+        tags=_tags(),
+    )
+
+
 @app.route("/spending")
 def spending():
     f = _filters_from_request()

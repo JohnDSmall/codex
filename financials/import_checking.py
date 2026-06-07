@@ -51,7 +51,8 @@ SOURCE_RULES = [
 TYPE_RULES = [
     (re.compile(r"\b(PAYROLL|DIRECT DEP|SALARY|ADP|GUSTO)\b", re.I), "Salary"),
     (re.compile(r"\bBONUS\b", re.I), "Bonus"),
-    (re.compile(r"\b(REIMBURSE|EXPENSE REPORT|EXP REPORT)\b", re.I), "Reimbursement"),
+    (re.compile(r"\bREIMBURS", re.I), "Reimbursement"),
+    (re.compile(r"\b(EXPENSE REPORT|EXP REPORT)\b", re.I), "Reimbursement"),
 ]
 
 # Description patterns to SKIP entirely (transfers in/out of own accounts).

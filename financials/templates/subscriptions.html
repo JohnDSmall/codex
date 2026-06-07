@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions{% endblock %}
+{% block body %}
+<h1>Subscriptions &amp; recurring</h1>
+
+<form method="get" class="spending-filters">
+  <label>Card
+    <select name="card">
+      <option value="">All cards</option>
+      {% for c in cards %}
+        <option value="{{ c }}" {% if filters.card == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Tag
+    <select name="tag">
+      <option value="">All tags</option>
+      {% for t in tags %}
+        <option value="{{ t.id }}" {% if filters.tag == t.id %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Show
+    <select name="active">
+      <option value="1" {% if active_only %}selected{% endif %}>Active only</option>
+      <option value="0" {% if not active_only %}selected{% endif %}>All recurring</option>
+    </select>
+  </label>
+  <button type="submit">Apply</button>
+</form>
+
+<section class="kpi-row">
+  <div class="kpi">
+    <h3>Est. Monthly</h3>
+    <div class="big neg">{{ total_monthly|money }}</div>
+    <div class="sub">across {{ subs|length }} recurring charges</div>
+  </div>
+  <div class="kpi">
+    <h3>Est. Annual</h3>
+    <div class="big neg">{{ total_annual|money }}</div>
+    <div class="sub">at current cadence</div>
+  </div>
+  <div class="kpi">
+    <h3>Filter</h3>
+    <div class="big">{{ 'Active' if active_only else 'All' }}</div>
+    <div class="sub">recurring charges (≥3 occurrences, ≥2 months)</div>
+  </div>
+  <div class="kpi">
+    <h3>Top monthly</h3>
+    <div class="big neg">{{ subs[0].monthly_cost|money if subs else '—' }}</div>
+    <div class="sub">{{ subs[0].merchant if subs else '' }}</div>
+  </div>
+</section>
+
+<table>
+  <thead>
+    <tr>
+      <th>Merchant</th>
+      <th>Cadence</th>
+      <th>Status</th>
+      <th class="right">Avg charge</th>
+      <th class="right">Monthly</th>
+      <th class="right">Annual</th>
+      <th class="right">Total paid</th>
+      <th>Last seen</th>
+      <th>Card</th>
+      <th>Category</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in subs %}
+    <tr class="{{ 'inactive' if not s.active else '' }}">
+      <td><strong>{{ s.merchant }}</strong></td>
+      <td>{{ s.cadence }}</td>
+      <td>
+        {% if s.active %}<span class="badge active">Active</span>
+        {% else %}<span class="badge inactive">Lapsed</span>{% endif %}
+      </td>
+      <td class="right">{{ s.avg_amount|money }}</td>
+      <td class="right neg"><strong>{{ s.monthly_cost|money }}</strong></td>
+      <td class="right neg">{{ s.annual_cost|money }}</td>
+      <td class="right">{{ s.total|money }}</td>
+      <td>{{ s.last_date }}</td>
+      <td>{{ s.cards }}</td>
+      <td>{{ s.categories }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="10" style="text-align:center; padding:2rem; color:#94a3b8;">No recurring charges match these filters.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

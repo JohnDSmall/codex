@@ -297,3 +297,17 @@ section { margin-bottom: 1.5rem; }
 }
 .chart-card h2 { margin-top: 0; }
 .chart-card canvas { flex: 1; min-height: 0; }
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge.active { background: #d1fae5; color: #065f46; }
+.badge.inactive { background: #fee2e2; color: #991b1b; }
+tr.inactive td { color: #94a3b8; }
+tr.inactive td:first-child strong { color: #64748b; }
