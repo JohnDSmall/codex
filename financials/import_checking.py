@@ -56,6 +56,12 @@ TYPE_RULES = [
     (re.compile(r"\bBONUS\b", re.I), "Bonus"),
     (re.compile(r"\bREIMBURS", re.I), "Reimbursement"),
     (re.compile(r"\b(EXPENSE REPORT|EXP REPORT)\b", re.I), "Reimbursement"),
+    # Handshake-specific: any Handshake deposit that didn't match PAYROLL
+    # above is an expense reimbursement (per user's confirmed pay structure).
+    # PAYROLL matches earlier so real salary is typed correctly; this only
+    # catches "Handshake DES:<code> PPD" and "Handshake-OSV DES:0000<id>"
+    # variants. Keep this AFTER PAYROLL so the order-of-rules works.
+    (re.compile(r"\bHANDSHAKE", re.I), "Reimbursement"),
 ]
 
 # Description patterns to SKIP entirely (transfers in/out of own accounts).
