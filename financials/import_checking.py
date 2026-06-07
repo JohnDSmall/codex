@@ -49,7 +49,10 @@ SOURCE_RULES = [
 ]
 
 TYPE_RULES = [
-    (re.compile(r"\b(PAYROLL|DIRECT DEP|SALARY|ADP|GUSTO)\b", re.I), "Salary"),
+    # No trailing \b on PAYROLL — banks often append a digit (PAYROLL873) or
+    # an ID (PAYROLLID:...), which would defeat a strict boundary match.
+    (re.compile(r"\bPAYROLL", re.I), "Salary"),
+    (re.compile(r"\b(DIRECT DEP|SALARY|ADP|GUSTO)\b", re.I), "Salary"),
     (re.compile(r"\bBONUS\b", re.I), "Bonus"),
     (re.compile(r"\bREIMBURS", re.I), "Reimbursement"),
     (re.compile(r"\b(EXPENSE REPORT|EXP REPORT)\b", re.I), "Reimbursement"),
