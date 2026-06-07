@@ -62,6 +62,13 @@ CREATE TABLE IF NOT EXISTS hours (
     tag_id INTEGER REFERENCES tags(id)
 );
 
+CREATE TABLE IF NOT EXISTS merchant_subscriptions (
+    merchant TEXT PRIMARY KEY,
+    status TEXT NOT NULL CHECK (status IN ('confirmed', 'rejected')),
+    notes TEXT,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 """
 
 INDEXES = """

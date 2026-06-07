@@ -309,5 +309,21 @@ section { margin-bottom: 1.5rem; }
 }
 .badge.active { background: #d1fae5; color: #065f46; }
 .badge.inactive { background: #fee2e2; color: #991b1b; }
+.badge.confirmed { background: #dbeafe; color: #1e40af; }
+.badge.rejected { background: #f3f4f6; color: #6b7280; }
 tr.inactive td { color: #94a3b8; }
 tr.inactive td:first-child strong { color: #64748b; }
+
+.action-cell { white-space: nowrap; }
+.btn-confirm, .btn-reject, .btn-clear {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.9rem;
+  margin-right: 0.2rem;
+}
+.btn-confirm:hover { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+.btn-reject:hover { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+.btn-clear:hover { background: #f3f4f6; border-color: #6b7280; }

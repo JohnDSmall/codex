@@ -263,15 +263,47 @@ def categorize(description: str) -> str | None:
     return None
 
 
-def clean_merchant(description: str) -> str:
-    """Strip APLPAY prefix, trailing city/state, normalize whitespace."""
+# 2-letter US state codes — used only as a strict end-of-string anchor.
+_US_STATES = (
+    "AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|"
+    "MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|"
+    "WI|WY|DC|PR"
+)
+
+
+def normalize_merchant(description: str) -> str:
+    """Return a canonical, comparable merchant string.
+
+    Conservative: only strips things that are reliably noise at the END of
+    the string — trailing state codes, phone numbers, common prefixes added
+    by the card network. Does NOT try to identify city names mid-string,
+    because state codes like NY and CA appear inside legitimate merchant
+    names ("AplPay NYCT PAYGO NEW YORK NY") and aggressive stripping
+    obliterates the actual name.
+    """
     d = description.strip()
-    d = re.sub(r"^AplPay\s+", "", d, flags=re.I)
-    # Strip trailing "  CITY  ST" pattern (Amex/BofA tail)
-    d = re.sub(r"\s{2,}[A-Z][A-Z\s\-']+\s+[A-Z]{2}\s*$", "", d)
-    # Collapse internal multi-spaces
-    d = re.sub(r"\s+", " ", d).strip()
+
+    # Strip common prefixes added by the card network or merchant aggregator.
+    d = re.sub(r"^(AplPay|DD \*|TST\*|MTA\*|NVN\* TRP \*?|SQ \*|PAYPAL \*)\s*",
+               "", d, flags=re.I)
+    d = d.upper()
+
+    # Trailing state code stuck to a .com/.net/.org URL: "ANTHROPIC.COMCA" -> ".COM"
+    d = re.sub(rf"(\.(?:COM|NET|ORG|IO|APP)(?:/[A-Z]+)?)({_US_STATES})$", r"\1", d)
+
+    # Trailing state code with leading whitespace (most common case).
+    d = re.sub(rf"\s+({_US_STATES})$", "", d)
+
+    # Trailing phone number(s): "877-778-1161"
+    d = re.sub(r"\s+\d{3}-\d{3,4}-\d{4}\s*$", "", d)
+
+    # Collapse whitespace and trim trailing noise punctuation.
+    d = re.sub(r"\s+", " ", d).strip(" -.,*")
     return d
+
+
+# Back-compat alias.
+clean_merchant = normalize_merchant
 
 
 def detect_card(header: tuple) -> str | None:

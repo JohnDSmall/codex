@@ -249,9 +249,14 @@ def subscriptions():
         f["from_date"] = None
         f["to_date"] = None
     active_only = request.args.get("active", "1") != "0"
+    show = request.args.get("show", "auto")  # auto | rejected | all
 
     conn = get_conn()
     where, params = _where_clause(f, "e")
+
+    # User overrides: confirmed merchants always show up; rejected hide by default.
+    overrides = {r["merchant"]: r["status"] for r in
+                 conn.execute("SELECT merchant, status FROM merchant_subscriptions")}
 
     # Group: prefer normalized merchant, fall back to description. Require
     # at least 3 occurrences across at least 2 distinct months to qualify.
@@ -279,18 +284,40 @@ def subscriptions():
     subs = []
     total_monthly = 0.0
     for r in rows:
+        merchant = r["merchant"]
+        status = overrides.get(merchant)  # 'confirmed' | 'rejected' | None
         amounts = [float(a) for a in r["amounts"].split(",")]
         cadence, factor = _classify_subscription(r["dates"].split(","), amounts)
-        if cadence is None:
-            continue
+
+        # Visibility rules:
+        #   show='auto'     -> auto-detected + confirmed, hide rejected
+        #   show='rejected' -> only rejected (for review)
+        #   show='all'      -> everything we have data for
+        if show == "rejected":
+            if status != "rejected":
+                continue
+            # Force-display rejected even without cadence (estimate as monthly).
+            if cadence is None:
+                cadence, factor = "Variable", 0.0
+        elif show == "all":
+            if cadence is None and status is None:
+                continue
+        else:  # auto
+            if status == "rejected":
+                continue
+            if cadence is None and status != "confirmed":
+                continue
+            if cadence is None:
+                cadence, factor = "Variable", 0.0
+
         last_iso = r["last_date"]
         active = _is_active(cadence, last_iso)
-        if active_only and not active:
+        if active_only and not active and status != "confirmed":
             continue
         monthly_cost = (r["avg_amount"] or 0) * factor
         total_monthly += monthly_cost
         subs.append({
-            "merchant": r["merchant"],
+            "merchant": merchant,
             "n": r["n"],
             "cadence": cadence,
             "avg_amount": r["avg_amount"],
@@ -300,6 +327,7 @@ def subscriptions():
             "first_date": r["first_date"],
             "last_date": r["last_date"],
             "active": active,
+            "status": status,
             "categories": r["cat_names"] or "",
             "cards": r["card_names"] or "",
         })
@@ -314,10 +342,33 @@ def subscriptions():
         total_monthly=total_monthly,
         total_annual=total_monthly * 12,
         active_only=active_only,
+        show=show,
         filters=f,
         cards=cards,
         tags=_tags(),
     )
+
+
+@app.route("/subscriptions/<path:merchant>/<action>", methods=["POST"])
+def subscription_action(merchant, action):
+    """Mark a merchant as confirmed/rejected as a subscription, or clear."""
+    if action not in ("confirm", "reject", "clear"):
+        abort(400)
+    conn = get_conn()
+    if action == "clear":
+        conn.execute("DELETE FROM merchant_subscriptions WHERE merchant=?", (merchant,))
+    else:
+        status = "confirmed" if action == "confirm" else "rejected"
+        conn.execute(
+            """INSERT INTO merchant_subscriptions (merchant, status)
+               VALUES (?, ?)
+               ON CONFLICT(merchant) DO UPDATE SET status=excluded.status,
+                                                   updated_at=CURRENT_TIMESTAMP""",
+            (merchant, status),
+        )
+    conn.commit()
+    conn.close()
+    return redirect(request.referrer or url_for("subscriptions"))
 
 
 @app.route("/spending")
