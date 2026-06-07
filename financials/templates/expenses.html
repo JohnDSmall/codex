@@ -23,7 +23,7 @@
     </select>
   </label>
   <button type="submit">Apply</button>
-  <a class="reset" href="{{ url_for('expenses') }}">Reset</a>
+  <a class="reset" href="{{ url_for('expenses', **{'from': '', 'to': ''}) }}">All time</a>
   <span class="total">Total: <strong class="neg">{{ total|money }}</strong> ({{ rows|length }} rows)</span>
 </form>
 

@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from collections import defaultdict
 from flask import Flask, render_template, request, redirect, url_for, abort
 from db import get_conn, init_db
@@ -9,14 +9,53 @@ app = Flask(__name__)
 INCOME_TYPES = ["Salary", "Bonus", "Reimbursement"]
 
 
+def _months_back(d: date, n: int) -> date:
+    """First day of the month that is n months before d's month."""
+    y, m = d.year, d.month - n
+    while m <= 0:
+        m += 12
+        y -= 1
+    return date(y, m, 1)
+
+
+def _last_completed_month_range():
+    """ISO dates (first, last) of the previous calendar month."""
+    today = date.today()
+    first_this = today.replace(day=1)
+    last_prev = first_this - timedelta(days=1)
+    first_prev = last_prev.replace(day=1)
+    return first_prev.isoformat(), last_prev.isoformat()
+
+
+def _trailing_3mo_range():
+    """ISO dates (first, last) covering the last 3 COMPLETED calendar months."""
+    today = date.today()
+    first_this = today.replace(day=1)
+    last_prev = first_this - timedelta(days=1)
+    three_back = _months_back(first_this, 3)
+    return three_back.isoformat(), last_prev.isoformat()
+
+
 def _filters_from_request():
-    """Pull standard spending filters from query string."""
+    """Pull standard spending filters from query string.
+
+    If from/to are entirely absent from the query string, apply the default
+    range (last completed calendar month). If either is present (even as an
+    empty string), honor the user's intent — e.g. ?from=&to= means "all time".
+    """
+    args = request.args
+    if "from" in args or "to" in args:
+        from_date = args.get("from") or None
+        to_date = args.get("to") or None
+    else:
+        from_date, to_date = _last_completed_month_range()
+
     return {
-        "card": request.args.get("card") or None,
-        "tag": request.args.get("tag", type=int),
-        "from_date": request.args.get("from") or None,
-        "to_date": request.args.get("to") or None,
-        "category": request.args.get("category", type=int),
+        "card": args.get("card") or None,
+        "tag": args.get("tag", type=int),
+        "from_date": from_date,
+        "to_date": to_date,
+        "category": args.get("category", type=int),
     }
 
 
@@ -142,7 +181,7 @@ def spending():
     conn = get_conn()
     where, params = _where_clause(f, "e")
 
-    # KPIs
+    # KPIs (Total/Transactions/Avg-per-txn over the filtered range)
     kpi_row = conn.execute(
         f"""SELECT COUNT(*) AS n,
                    COALESCE(SUM(amount), 0) AS total,
@@ -151,7 +190,19 @@ def spending():
             FROM expenses e {where}""", params
     ).fetchone()
     kpi = dict(kpi_row)
-    kpi["monthly_avg"] = kpi["total"] / kpi["months"] if kpi["months"] else 0
+
+    # Avg/Month is computed over the trailing 3 completed calendar months,
+    # independent of the date filter (but still respects card/tag/category).
+    m3_from, m3_to = _trailing_3mo_range()
+    m3_filters = {**f, "from_date": m3_from, "to_date": m3_to}
+    m3_where, m3_params = _where_clause(m3_filters, "e")
+    m3 = conn.execute(
+        f"""SELECT COALESCE(SUM(amount), 0) AS total,
+                   COUNT(DISTINCT substr(date, 1, 7)) AS months
+            FROM expenses e {m3_where}""", m3_params
+    ).fetchone()
+    kpi["monthly_avg"] = m3["total"] / 3 if m3["months"] else 0
+    kpi["monthly_avg_window"] = f"{m3_from} to {m3_to}"
 
     # Per-card breakdown (respects all filters except card itself for the card list)
     card_where, card_params = _where_clause({**f, "card": None}, "e")
