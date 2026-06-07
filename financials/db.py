@@ -79,13 +79,21 @@ def _migrate(conn):
     for col in ("card", "merchant", "source"):
         if col not in cols:
             conn.execute(f"ALTER TABLE expenses ADD COLUMN {col} TEXT")
+    inc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(income)")}
+    for col in ("income_type", "source_account", "source_file"):
+        if col not in inc_cols:
+            conn.execute(f"ALTER TABLE income ADD COLUMN {col} TEXT")
 
 DEFAULT_TAGS = [
-    "General Life",
-    "Freelance Consulting",
+    "General Life",         # legacy — pre-Personal
+    "Personal",             # personal life expenses (credit cards default here)
+    "Freelance Consulting", # legacy — pre-source-split
     "Halo",
     "Snorkel",
     "HAI",
+    "Handshake",
+    "7 Shot Tennis",
+    "Other",
 ]
 
 DEFAULT_CATEGORIES = [

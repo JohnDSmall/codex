@@ -6,6 +6,8 @@ from db import get_conn, init_db
 
 app = Flask(__name__)
 
+INCOME_TYPES = ["Salary", "Bonus", "Reimbursement"]
+
 
 def _filters_from_request():
     """Pull standard spending filters from query string."""
@@ -141,10 +143,15 @@ def spending():
     where, params = _where_clause(f, "e")
 
     # KPIs
-    kpi = conn.execute(
-        f"SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total, "
-        f"COALESCE(AVG(amount), 0) AS avg FROM expenses e {where}", params
+    kpi_row = conn.execute(
+        f"""SELECT COUNT(*) AS n,
+                   COALESCE(SUM(amount), 0) AS total,
+                   COALESCE(AVG(amount), 0) AS avg,
+                   COUNT(DISTINCT substr(date, 1, 7)) AS months
+            FROM expenses e {where}""", params
     ).fetchone()
+    kpi = dict(kpi_row)
+    kpi["monthly_avg"] = kpi["total"] / kpi["months"] if kpi["months"] else 0
 
     # Per-card breakdown (respects all filters except card itself for the card list)
     card_where, card_params = _where_clause({**f, "card": None}, "e")
@@ -291,6 +298,7 @@ def income():
         tags=_tags(),
         active_tag=tag_filter,
         today=date.today().isoformat(),
+        income_types=INCOME_TYPES,
     )
 
 
@@ -299,7 +307,8 @@ def add_income():
     f = request.form
     conn = get_conn()
     conn.execute(
-        "INSERT INTO income (date, description, amount, client, tag_id, notes) VALUES (?, ?, ?, ?, ?, ?)",
+        """INSERT INTO income (date, description, amount, client, tag_id, notes, income_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (
             f["date"],
             f["description"],
@@ -307,6 +316,7 @@ def add_income():
             f.get("client") or None,
             int(f["tag_id"]),
             f.get("notes") or None,
+            f.get("income_type") or None,
         ),
     )
     conn.commit()

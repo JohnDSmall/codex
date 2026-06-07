@@ -374,7 +374,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("path", nargs="?", help="CSV file or directory of CSVs (omit with --recategorize-only)")
     ap.add_argument("--card", choices=["Amex", "BofA"], help="Force card type")
-    ap.add_argument("--tag", default="General Life", help="Tag name to apply")
+    ap.add_argument("--tag", default="Personal", help="Tag name to apply")
     ap.add_argument("--recategorize-only", action="store_true",
                     help="Skip import; just re-run category rules on existing uncategorized rows")
     args = ap.parse_args()
