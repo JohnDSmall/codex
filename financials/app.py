@@ -1,9 +1,49 @@
+import json
 from datetime import date
 from collections import defaultdict
 from flask import Flask, render_template, request, redirect, url_for, abort
 from db import get_conn, init_db
 
 app = Flask(__name__)
+
+
+def _filters_from_request():
+    """Pull standard spending filters from query string."""
+    return {
+        "card": request.args.get("card") or None,
+        "tag": request.args.get("tag", type=int),
+        "from_date": request.args.get("from") or None,
+        "to_date": request.args.get("to") or None,
+        "category": request.args.get("category", type=int),
+    }
+
+
+def _where_clause(f, table_alias="e"):
+    """Build WHERE fragment and params from a filter dict."""
+    clauses, params = [], []
+    if f.get("card"):
+        clauses.append(f"{table_alias}.card = ?")
+        params.append(f["card"])
+    if f.get("tag"):
+        clauses.append(f"{table_alias}.tag_id = ?")
+        params.append(f["tag"])
+    if f.get("from_date"):
+        clauses.append(f"{table_alias}.date >= ?")
+        params.append(f["from_date"])
+    if f.get("to_date"):
+        clauses.append(f"{table_alias}.date <= ?")
+        params.append(f["to_date"])
+    if f.get("category"):
+        clauses.append(f"{table_alias}.category_id = ?")
+        params.append(f["category"])
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    return where, params
+
+
+def _distinct_cards(conn):
+    return [r["card"] for r in conn.execute(
+        "SELECT DISTINCT card FROM expenses WHERE card IS NOT NULL ORDER BY card"
+    )]
 
 
 def _tags():
@@ -94,20 +134,98 @@ def dashboard():
     )
 
 
+@app.route("/spending")
+def spending():
+    f = _filters_from_request()
+    conn = get_conn()
+    where, params = _where_clause(f, "e")
+
+    # KPIs
+    kpi = conn.execute(
+        f"SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total, "
+        f"COALESCE(AVG(amount), 0) AS avg FROM expenses e {where}", params
+    ).fetchone()
+
+    # Per-card breakdown (respects all filters except card itself for the card list)
+    card_where, card_params = _where_clause({**f, "card": None}, "e")
+    by_card = conn.execute(
+        f"""SELECT e.card AS card, COUNT(*) AS n, SUM(amount) AS total
+            FROM expenses e {card_where}
+            GROUP BY e.card ORDER BY total DESC""", card_params
+    ).fetchall()
+
+    # Category breakdown (chart 1)
+    by_cat = conn.execute(
+        f"""SELECT COALESCE(c.name, 'Uncategorized') AS cat, SUM(e.amount) AS total
+            FROM expenses e LEFT JOIN categories c ON c.id=e.category_id
+            {where}
+            GROUP BY cat ORDER BY total DESC""", params
+    ).fetchall()
+
+    # Monthly timeline (chart 2)
+    by_month = conn.execute(
+        f"""SELECT substr(e.date, 1, 7) AS m, SUM(e.amount) AS total
+            FROM expenses e {where}
+            GROUP BY m ORDER BY m""", params
+    ).fetchall()
+
+    # Top merchants
+    top_merchants = conn.execute(
+        f"""SELECT COALESCE(e.merchant, e.description) AS merchant,
+                   COUNT(*) AS n, SUM(e.amount) AS total
+            FROM expenses e {where}
+            GROUP BY merchant ORDER BY total DESC LIMIT 15""", params
+    ).fetchall()
+
+    # Itemized list (paginated)
+    rows = conn.execute(
+        f"""SELECT e.*, t.name AS tag_name, c.name AS cat_name
+            FROM expenses e LEFT JOIN tags t ON t.id=e.tag_id
+            LEFT JOIN categories c ON c.id=e.category_id
+            {where}
+            ORDER BY e.date DESC LIMIT 200""", params
+    ).fetchall()
+
+    cards = _distinct_cards(conn)
+    conn.close()
+
+    category_chart = {
+        "labels": [r["cat"] for r in by_cat],
+        "data": [round(r["total"], 2) for r in by_cat],
+    }
+    month_chart = {
+        "labels": [r["m"] for r in by_month],
+        "data": [round(r["total"], 2) for r in by_month],
+    }
+
+    return render_template(
+        "spending.html",
+        filters=f,
+        kpi=kpi,
+        by_card=by_card,
+        by_cat=by_cat,
+        top_merchants=top_merchants,
+        rows=rows,
+        cards=cards,
+        tags=_tags(),
+        category_chart_json=json.dumps(category_chart),
+        month_chart_json=json.dumps(month_chart),
+    )
+
+
 @app.route("/expenses")
 def expenses():
-    tag_filter = request.args.get("tag", type=int)
+    f = _filters_from_request()
     conn = get_conn()
-    q = """SELECT e.*, t.name AS tag_name, c.name AS cat_name
-           FROM expenses e LEFT JOIN tags t ON t.id=e.tag_id
-           LEFT JOIN categories c ON c.id=e.category_id"""
-    params = []
-    if tag_filter:
-        q += " WHERE e.tag_id = ?"
-        params.append(tag_filter)
-    q += " ORDER BY date DESC LIMIT 500"
+    where, params = _where_clause(f, "e")
+    q = f"""SELECT e.*, t.name AS tag_name, c.name AS cat_name
+            FROM expenses e LEFT JOIN tags t ON t.id=e.tag_id
+            LEFT JOIN categories c ON c.id=e.category_id
+            {where}
+            ORDER BY date DESC LIMIT 500"""
     rows = conn.execute(q, params).fetchall()
     total = sum(r["amount"] for r in rows)
+    cards = _distinct_cards(conn)
     conn.close()
     return render_template(
         "expenses.html",
@@ -115,7 +233,8 @@ def expenses():
         total=total,
         tags=_tags(),
         categories=_categories(),
-        active_tag=tag_filter,
+        cards=cards,
+        filters=f,
         today=date.today().isoformat(),
     )
 

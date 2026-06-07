@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS expenses (
     tag_id INTEGER REFERENCES tags(id),
     client TEXT,
     tax_status TEXT,
-    notes TEXT
+    notes TEXT,
+    card TEXT,
+    merchant TEXT,
+    source TEXT
 );
 
 CREATE TABLE IF NOT EXISTS income (
@@ -59,11 +62,23 @@ CREATE TABLE IF NOT EXISTS hours (
     tag_id INTEGER REFERENCES tags(id)
 );
 
+"""
+
+INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_tag ON expenses(tag_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_card ON expenses(card);
 CREATE INDEX IF NOT EXISTS idx_income_date ON income(date);
 CREATE INDEX IF NOT EXISTS idx_income_tag ON income(tag_id);
 """
+
+
+def _migrate(conn):
+    """Add columns added after initial schema. Safe to re-run."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(expenses)")}
+    for col in ("card", "merchant", "source"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE expenses ADD COLUMN {col} TEXT")
 
 DEFAULT_TAGS = [
     "General Life",
@@ -132,6 +147,8 @@ def get_conn():
 def init_db():
     conn = get_conn()
     conn.executescript(SCHEMA)
+    _migrate(conn)
+    conn.executescript(INDEXES)
 
     for tag in DEFAULT_TAGS:
         conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag,))

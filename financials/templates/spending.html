@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Spending{% endblock %}
+{% block body %}
+<h1>Spending</h1>
+
+<form method="get" class="spending-filters">
+  <label>From <input type="date" name="from" value="{{ filters.from_date or '' }}"></label>
+  <label>To <input type="date" name="to" value="{{ filters.to_date or '' }}"></label>
+  <label>Card
+    <select name="card">
+      <option value="">All cards</option>
+      {% for c in cards %}
+        <option value="{{ c }}" {% if filters.card == c %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+      <option value="manual" {% if filters.card == 'manual' %}selected{% endif %}>(manual)</option>
+    </select>
+  </label>
+  <label>Tag
+    <select name="tag">
+      <option value="">All tags</option>
+      {% for t in tags %}
+        <option value="{{ t.id }}" {% if filters.tag == t.id %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Apply</button>
+  <a class="reset" href="{{ url_for('spending') }}">Reset</a>
+</form>
+
+<section class="kpi-row">
+  <div class="kpi"><h3>Total</h3><div class="big neg">{{ kpi.total|money }}</div></div>
+  <div class="kpi"><h3>Transactions</h3><div class="big">{{ kpi.n }}</div></div>
+  <div class="kpi"><h3>Avg</h3><div class="big">{{ kpi.avg|money }}</div></div>
+</section>
+
+<section class="card-pills-row">
+  {% for c in by_card %}
+    <a href="{{ url_for('spending', card=c.card, **{'from': filters.from_date or '', 'to': filters.to_date or '', 'tag': filters.tag or ''}) }}"
+       class="card-pill {% if filters.card == c.card %}active{% endif %}">
+      <div class="name">{{ c.card or 'manual' }}</div>
+      <div class="total neg">{{ c.total|money }}</div>
+      <div class="count">{{ c.n }} txns</div>
+    </a>
+  {% endfor %}
+</section>
+
+<section class="chart-grid">
+  <div class="chart-card">
+    <h2>Spending by category</h2>
+    <canvas id="categoryChart" height="240"></canvas>
+  </div>
+  <div class="chart-card">
+    <h2>Spending over time</h2>
+    <canvas id="monthChart" height="240"></canvas>
+  </div>
+</section>
+
+<section class="two-col">
+  <div>
+    <h2>Top merchants</h2>
+    <table>
+      <thead><tr><th>Merchant</th><th class="right">Count</th><th class="right">Total</th></tr></thead>
+      <tbody>
+      {% for m in top_merchants %}
+        <tr>
+          <td>{{ m.merchant }}</td>
+          <td class="right">{{ m.n }}</td>
+          <td class="right neg">{{ m.total|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <h2>By category</h2>
+    <table>
+      <thead><tr><th>Category</th><th class="right">Total</th></tr></thead>
+      <tbody>
+      {% for c in by_cat %}
+        <tr>
+          <td>{{ c.cat }}</td>
+          <td class="right neg">{{ c.total|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Itemized ({{ rows|length }} most recent)</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Description</th><th>Merchant</th><th>Category</th><th>Card</th><th>Tag</th><th class="right">Amount</th></tr></thead>
+    <tbody>
+    {% for e in rows %}
+      <tr>
+        <td>{{ e.date }}</td>
+        <td>{{ e.description }}</td>
+        <td>{{ e.merchant or '' }}</td>
+        <td>{{ e.cat_name or '' }}</td>
+        <td>{{ e.card or '' }}</td>
+        <td><span class="tag">{{ e.tag_name }}</span></td>
+        <td class="right neg">{{ e.amount|money }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const catData = {{ category_chart_json|safe }};
+const monthData = {{ month_chart_json|safe }};
+
+const palette = [
+  '#1f2937','#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+  '#06b6d4','#ec4899','#84cc16','#f97316','#6366f1','#14b8a6',
+];
+
+new Chart(document.getElementById('categoryChart'), {
+  type: 'bar',
+  data: {
+    labels: catData.labels,
+    datasets: [{
+      label: 'Spend',
+      data: catData.data,
+      backgroundColor: catData.labels.map((_, i) => palette[i % palette.length]),
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { ticks: { callback: v => '$' + v.toLocaleString() } } },
+    responsive: true,
+    maintainAspectRatio: false,
+  }
+});
+
+new Chart(document.getElementById('monthChart'), {
+  type: 'line',
+  data: {
+    labels: monthData.labels,
+    datasets: [{
+      label: 'Monthly spend',
+      data: monthData.data,
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.15)',
+      tension: 0.25,
+      fill: true,
+      pointRadius: 3,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { y: { ticks: { callback: v => '$' + v.toLocaleString() } } },
+    responsive: true,
+    maintainAspectRatio: false,
+  }
+});
+</script>
+{% endblock %}

@@ -181,3 +181,113 @@ button.del {
 button.del:hover { color: #dc2626; }
 
 section { margin-bottom: 1.5rem; }
+
+.spending-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: end;
+  background: #fff;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.spending-filters label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  gap: 0.25rem;
+}
+.spending-filters input, .spending-filters select {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  min-width: 130px;
+}
+.spending-filters button {
+  background: #1f2937;
+  color: #fff;
+  border: 0;
+  padding: 0.5rem 1.1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.spending-filters button:hover { background: #374151; }
+.spending-filters .reset {
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.5rem;
+}
+.spending-filters .reset:hover { color: #1f2937; }
+.spending-filters .total {
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: #475569;
+  padding-bottom: 0.4rem;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.kpi {
+  background: #fff;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.kpi h3 { margin: 0 0 0.4rem; }
+.kpi .big {
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-pills-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.card-pill {
+  background: #fff;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #1f2937;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 2px solid transparent;
+  min-width: 130px;
+}
+.card-pill.active { border-color: #1f2937; }
+.card-pill .name { font-weight: 600; font-size: 0.95rem; }
+.card-pill .total { font-size: 1.1rem; font-weight: 700; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+.card-pill .count { font-size: 0.75rem; color: #6b7280; }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 1000px) { .chart-grid { grid-template-columns: 1fr; } }
+.chart-card {
+  background: #fff;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+.chart-card h2 { margin-top: 0; }
+.chart-card canvas { flex: 1; min-height: 0; }
