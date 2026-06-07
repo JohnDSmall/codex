@@ -4,6 +4,7 @@
 <h1>Spending</h1>
 
 <form method="get" class="spending-filters">
+  <label>Search <input type="search" name="q" value="{{ filters.q or '' }}" placeholder="merchant or description" style="min-width: 200px"></label>
   <label>From <input type="date" name="from" value="{{ filters.from_date or '' }}"></label>
   <label>To <input type="date" name="to" value="{{ filters.to_date or '' }}"></label>
   <label>Card

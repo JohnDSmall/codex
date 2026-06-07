@@ -56,6 +56,7 @@ def _filters_from_request():
         "from_date": from_date,
         "to_date": to_date,
         "category": args.get("category", type=int),
+        "q": (args.get("q") or "").strip() or None,
     }
 
 
@@ -77,6 +78,12 @@ def _where_clause(f, table_alias="e"):
     if f.get("category"):
         clauses.append(f"{table_alias}.category_id = ?")
         params.append(f["category"])
+    if f.get("q"):
+        like = f"%{f['q']}%"
+        clauses.append(
+            f"({table_alias}.description LIKE ? OR {table_alias}.merchant LIKE ?)"
+        )
+        params.extend([like, like])
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     return where, params
 
