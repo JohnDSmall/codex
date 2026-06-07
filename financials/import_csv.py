@@ -299,6 +299,24 @@ def normalize_merchant(description: str) -> str:
 
     # Collapse whitespace and trim trailing noise punctuation.
     d = re.sub(r"\s+", " ", d).strip(" -.,*")
+
+    # Collapse repeated merchant tokens: when consecutive whitespace-separated
+    # tokens share a 5+ character prefix, the bank is double-printing the
+    # merchant name (e.g. "CRUNCHYROLL.COM CRUNCHYROLL.CTX" or
+    # "STARRY.COM STARRY.COM"). Keep the first occurrence.
+    tokens = d.split()
+    deduped = []
+    for tok in tokens:
+        if any(len(tok) >= 5 and tok[:5] == prev[:5] for prev in deduped):
+            continue
+        deduped.append(tok)
+    d = " ".join(deduped)
+
+    # Drop a trailing TLD when it stands alone (".COM" at end). This lets
+    # "CRUNCHYROLL.COM" and "CRUNCHYROLL" group together. Leaves URLs with
+    # paths alone ("AMZN.COM/BILL" stays).
+    d = re.sub(r"\.(?:COM|NET|ORG|IO|APP)$", "", d)
+    d = d.strip(" -.,*")
     return d
 
 
