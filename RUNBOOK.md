@@ -17,47 +17,32 @@ Verified working on this machine 2026-07-25.
 
 ## ⚠️ START HERE — state as of 2026-07-25
 
-**One action is outstanding.** Everything else is done and verified.
+**Two actions are outstanding:** push to GitHub, and rotate the Supabase key. Everything else is done
+and verified.
 
-### 1. Apply the wealth-snapshots migration (NOT YET RUN)
+### 1. Push to GitHub (COMMITTED BUT NOT PUSHED)
 
-`supabase/migrations/20260725160000_wealth_snapshots.sql` has **not** been applied. Until it is,
-`/wealth` runs in a degraded fallback mode (yearly history, no editing) and shows an amber banner.
-
-There is no Supabase CLI on this machine, so use the SQL editor:
+The session's work is in three commits on `main` — the `financials/`→`ephemeris/` rename, the merged
+web app, and the wealth-snapshots rebuild — but `git push` fails:
 
 ```
-https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new
+remote: Invalid username or token. Password authentication is not supported for Git operations.
 ```
 
-Paste the file's contents → **Run** → expect `Success. No rows returned.` It is idempotent.
+Git Credential Manager holds a stale GitHub credential and `gh` is **not installed** on this machine.
+GCM can't prompt from a non-interactive shell, so the push has to be run from an interactive terminal.
+If it still fails, clear the stored credential first — Windows **Credential Manager → Windows
+Credentials → `git:https://github.com`** → Remove — then push again and sign in fresh.
 
-To put it on the clipboard:
+Note that `RUNBOOK.md` names the Supabase project ref and dashboard URL. No keys, but it does identify
+the project in a public repo. Scrub to `<project-ref>` first if that matters.
 
-```powershell
-Get-Content -Raw "C:\Users\Cameron Corse\projects\codex\supabase\migrations\20260725160000_wealth_snapshots.sql" | Set-Clipboard
-```
-
-**After running it, verify:**
-
-```powershell
-# expect the amber banner gone, buttons present, ~4 readings per account
-curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:3000/wealth
-```
-Net worth should still reconcile to **$249,100** across 6 accounts, and the chart should gain 2025
-points (currently the chart stops at 2024-12-31 while `current_value` holds stranded 2025 numbers).
-
-### 2. Nothing is committed
-
-The entire session's work is uncommitted in the working tree — the `financials/`→`ephemeris/` rename,
-the merged web app, both migrations, and this runbook. `git status` to see it. No commits, no pushes.
-
-### 3. Rotate the Supabase service key
+### 2. Rotate the Supabase service key
 
 `web/.env.local` holds a working service-role key that was pasted into a chat transcript. Rotate it at
 Project Settings → API when convenient and update the file. Project ref: `qwkdjxzgqrnbzrohaekg`.
 
-### 4. Dev servers won't survive a session restart
+### 3. Dev servers won't survive a session restart
 
 Both were started as background tasks. Restart with:
 
@@ -72,6 +57,18 @@ If port 3000 is stuck held by an orphaned process, see Gotcha 7.
 > **Ephemeris was merged into the web app on 2026-07-25.** The sidebar entry "Financials" is now **Ephemeris** → `/ephemeris`, a full port of all 7 Flask screens including add/delete. `/financials` 307-redirects to `/ephemeris` so old links keep working.
 >
 > **Live as of 2026-07-25.** Migration applied, 289 rows exported to Supabase, all 7 screens verified against the Flask originals. The Flask app remains as a fallback and still owns the CSV importers.
+
+> **Wealth snapshots applied 2026-07-25.** `/wealth` is out of fallback mode — header reads
+> `6 accounts · 24 dated readings · latest 2025-11-28`, write buttons present. The backfill produced
+> exactly 4 readings per account (18 from `eoy_values`, 6 from `current_value`), every account's newest
+> snapshot equals its `current_value`, and net worth reconciles to **$249,100**. Carry-forward verified
+> against the rendered history at all 7 dates.
+>
+> **Expect a trough in the chart around Oct–Nov 2025 — it is a measurement artifact, not a loss.** BA
+> Savings was re-valued down on 2025-10-20 (103,428 → 11,800) but Schwab was not re-valued up until
+> 2025-11-13 (47,800 → 155,300). The money appears to leave one account 24 days before arriving in the
+> other, so net worth dips to $134,348 and recovers. Carry-forward is behaving correctly; the gap is in
+> when the readings were taken. Adding a Schwab snapshot at the real transfer date would close it.
 
 ---
 
@@ -451,10 +448,20 @@ Seven migrations in `supabase/migrations/`. There is no local Supabase stack and
 | `20260525150000_companies_projects_wealth.sql` | ✅ |
 | `20260624000000_relationship_sqs_flags.sql` | ✅ |
 | `20260725120000_ephemeris_financials.sql` | ✅ applied 2026-07-25 |
-| `20260725160000_wealth_snapshots.sql` | ❌ **NOT YET APPLIED** |
+| `20260725160000_wealth_snapshots.sql` | ✅ applied 2026-07-25 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
+
+**Getting a migration onto the clipboard:** run this yourself in an interactive terminal —
+
+```powershell
+Get-Content -Raw "supabase\migrations\<file>.sql" | Set-Clipboard
+```
+
+`Set-Clipboard` run by an agent in a background session writes to *that* session's clipboard, not your
+desktop's. It reports success and you paste something else entirely. Either run the line yourself or
+open the file and copy it by hand.
 
 ---
 
