@@ -22,7 +22,7 @@ const NAV: NavItem[] = [
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/relationships", label: "Relationships", icon: Users },
   { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/financials", label: "Financials", icon: LineChart },
+  { href: "/ephemeris", label: "Ephemeris", icon: LineChart },
   { href: "/wealth", label: "Wealth", icon: Coins },
 ];
 

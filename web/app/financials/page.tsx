@@ -1,5 +1,6 @@
-import { UnderConstruction } from "../components/UnderConstruction";
+import { redirect } from "next/navigation";
 
+/** Financials was renamed to Ephemeris; keep old links working. */
 export default function FinancialsPage() {
-  return <UnderConstruction title="Financials" blurb="Income, expenses, and the five life-area tag taxonomy." />;
+  redirect("/ephemeris");
 }
