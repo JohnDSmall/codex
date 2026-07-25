@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "financials.db"
+DB_PATH = Path(__file__).parent / "ephemeris.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tags (
