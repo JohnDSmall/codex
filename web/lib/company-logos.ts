@@ -1,156 +1,89 @@
-// Static mapping of company name → logo file in /public/company_logos.
-// Filename listing comes from the original Codex app; mapping below covers
-// the common variations of each company name that may appear on a contact's
-// organization or categories field.
+// Company name → logo resolution.
+//
+// `companies.logo_path` in Supabase is the source of truth for which image a
+// company uses; this module no longer hardcodes filenames. What stays here is
+// the part the database can't answer: the many ways a single company is spelled
+// across contact records (`organization`, `primary_company`, `company_tags`).
+//
+// Everything below is pure and synchronous so it can run inside Client
+// Components. Load the map server-side with `loadCompanyLogoMap()` from
+// `lib/company-logos-server.ts` and pass it down as a prop.
 
-const FILE_BY_KEY: Record<string, string> = {
-  "8451": "8451.png",
-  "automation anywhere": "Automation_Anywhere.png",
-  cengage: "Cengage.png",
-  geowealth: "GeoWealth.png",
-  grubhub: "GrubHub.png",
-  jefferies: "Jefferies.png",
-  potbelly: "Potbelly.png",
-  protiviti: "Protiviti.png",
-  aarete: "aarete.png",
-  abbott: "abbott.svg",
-  abusch: "abusch.png",
-  accenture: "accenture.png",
-  aldi: "aldi.png",
-  alight: "alight.png",
-  alixpartners: "alixpartners.png",
-  "alston bird": "alstonbird.png",
-  amex: "amex.png",
-  "american express": "amex.png",
-  anthropic: "anthropic.png",
-  aston: "aston.png",
-  "atp tour": "atp_tour.png",
-  att: "att.png",
-  "at&t": "att.png",
-  audacious: "audacious.jfif",
-  avanade: "avanade-logo-vector.png",
-  bae: "bae.png",
-  "bain & co": "bain_co.png",
-  "bain & company": "bain_co.png",
-  bain: "bain_co.png",
-  bcg: "bcg.png",
-  "boston consulting group": "bcg.png",
-  beghou: "beghou_consulting.png",
-  "beghou consulting": "beghou_consulting.png",
-  bofa: "bofa.webp",
-  "bank of america": "bofa.webp",
-  booz: "booz.png",
-  "booz allen": "booz.png",
-  capgemini: "capgemini.png",
-  "capital one": "capitalone.png",
-  carilion: "carilion.png",
-  carvana: "carvana.png",
-  caterpillar: "caterpillar.png",
-  "chicago bulls": "chicagobulls.svg",
-  chs: "chs.png",
-  circle: "circle.jpg",
-  citadel: "citadel.jpg",
-  citi: "citi.png",
-  citigroup: "citi.png",
-  "credit suisse": "creditsuisse.png",
-  "deutsche bank": "dbank.png",
-  "dc advisory": "dcadvisory.jfif",
-  "del morgan": "delmorgan.jfif",
-  deloitte: "deloitte.png",
-  disney: "disney.png",
-  evicore: "evicore.png",
-  ey: "ey.png",
-  "ernst & young": "ey.png",
-  fprime: "fprime.png",
-  "f-prime": "fprime.png",
-  freelancer: "freelancer.png",
-  fti: "fti.png",
-  "fti consulting": "fti.png",
-  gallo: "gallo.png",
-  ge: "ge.png",
-  geico: "geico.png",
-  google: "google.png",
-  groupharm: "groupharm.png",
-  gs: "gs.png",
-  "goldman sachs": "gs.png",
-  gt: "gt.png",
-  "grant thornton": "gt.png",
-  halo: "halo.jfif",
-  iac: "iac.png",
-  idea: "idea.jpg",
-  ieq: "ieq.png",
-  invesity: "invesity.webp",
-  "jp morgan": "jp_morgan.png",
-  jpmorgan: "jp_morgan.png",
-  "j.p. morgan": "jp_morgan.png",
-  kh: "kh.png",
-  kkr: "kkr.png",
-  kpmg: "kpmg.png",
-  lazard: "lazard.png",
-  lek: "lek.png",
-  "l.e.k.": "lek.png",
-  "l.e.k. consulting": "lek.png",
-  loreal: "loreal.png",
-  "l'oreal": "loreal.png",
-  "maven wave": "maven-wave.webp",
-  mckinsey: "mckinsey.png",
-  "mckinsey & company": "mckinsey.png",
-  microsoft: "microsoft.png",
-  "morgan stanley": "morganstanley.png",
-  mvw: "mvw.png",
-  nike: "nike.png",
-  "notre dame": "notredame.png",
-  "ohio state": "ohiostate.png",
-  oracle: "oracle.png",
-  "p&g": "pandg.png",
-  "procter & gamble": "pandg.png",
-  paraveda: "paraveda.png",
-  pariveda: "paraveda.png",
-  "penn state": "pennstate.png",
-  persona: "persona.png",
-  pwc: "pwc.png",
-  ramp: "ramp.png",
-  reflection: "reflection.svg",
-  ridgeline: "ridgeline.png",
-  salesforce: "salesforce.png",
-  "salt ai": "saltai.jfif",
-  saltai: "saltai.jfif",
-  sap: "sap.png",
-  scale: "scale.svg",
-  "scale ai": "scale.svg",
-  servicenow: "servicenow.png",
-  snorkel: "snorkel_ai.png",
-  "snorkel ai": "snorkel_ai.png",
-  spotify: "spotify.png",
-  stanford: "stanford.png",
-  texas: "texas.png",
-  "ut austin": "texas.png",
-  trek10: "trek10.png",
-  trilantic: "trilantic.png",
-  ubs: "ubs.png",
-  utr: "utr.png",
-  "valley capital": "valleycapital.png",
-  "valor equity": "valorequity.png",
-  vanguard: "vanguard.png",
-  "vera equity": "veraequity.svg",
-  visa: "visa.png",
-  walmart: "walmart.png",
-  wellington: "wellington.png",
-  "wells fargo": "wellsfargo.png",
-  wellsfargo: "wellsfargo.png",
-  "west monroe": "westmonroe.png",
-  "west monroe partners": "westmonroe.png",
-  "west point": "westpoint.png",
-  whirlpool: "whirlpool.png",
-  "william blair": "williamblair.png",
-  wilson: "wilson.png",
-  wmu: "wmu.png",
-  "western michigan": "wmu.png",
-  wta: "wta.png",
-  yale: "yale.png",
+/** Normalized company name → public path, e.g. "84.51" → "/company_logos/8451.png". */
+export type CompanyLogoMap = Record<string, string>;
+
+export type CompanyLogoRow = {
+  company_id: string;
+  display_name: string | null;
+  logo_path: string | null;
 };
 
-function normalize(name: string): string {
+// Name variant → the canonical company name in the `companies` table.
+// Derived from the filename map this module used to carry, so every spelling
+// that resolved before still resolves. Add an entry when contact data spells a
+// company differently than its `companies` row.
+const NAME_ALIASES: Record<string, string> = {
+  "8451": "84.51",
+  abusch: "Anheuser-Busch",
+  alight: "Alight Solutions",
+  alixpartners: "Alix Partners",
+  "alston bird": "Alston & Bird",
+  amex: "American Express",
+  aston: "Aston Martin",
+  att: "AT&T",
+  audacious: "Audacious Ventures",
+  avanade: "Avande",
+  bae: "BAE Systems",
+  bain: "Bain & Company",
+  "bain & co": "Bain & Company",
+  "bain and company": "Bain & Company",
+  beghou: "Beghou Consulting",
+  bofa: "Bank of America",
+  booz: "Booz Allen Hamilton",
+  "booz allen": "Booz Allen Hamilton",
+  "boston consulting group": "BCG",
+  citigroup: "Citi",
+  "del morgan": "DelMorgan & Co.",
+  "ernst & young": "EY",
+  "f-prime": "F-Prime Capital",
+  fprime: "F-Prime Capital",
+  freelancer: "Self Employed",
+  fti: "FTI Consulting",
+  gallo: "Gallo Wine",
+  groupharm: "Group Harmonics",
+  gs: "Goldman Sachs",
+  iac: "IA Collaborative",
+  idea: "IDEA Center",
+  ieq: "IEQ Capital",
+  invesity: "INVENSITY",
+  "j.p. morgan": "JP Morgan",
+  jpmorgan: "JP Morgan",
+  kh: "Kraft Heinz",
+  "l.e.k. consulting": "L.E.K.",
+  "l'oreal": "Loreal",
+  lek: "L.E.K.",
+  mckinsey: "McKinsey & Company",
+  mvw: "Marriott Vacation Worldwide",
+  paraveda: "Pariveda",
+  "procter & gamble": "P&G",
+  reflection: "Reflection AI",
+  saltai: "Salt AI",
+  scale: "Scale AI",
+  servicenow: "Service Now",
+  snorkel: "Snorkel AI",
+  texas: "University of Texas",
+  "ut austin": "University of Texas",
+  "valley capital": "Valley Capital Partners",
+  "valor equity": "Valor Equity Partners",
+  wellington: "Wellington Management",
+  wellsfargo: "Wells Fargo",
+  "west monroe partners": "West Monroe",
+  "western michigan": "Western Michigan University",
+  wmu: "Western Michigan University",
+  yale: "Yale University",
+};
+
+export function normalizeCompanyName(name: string): string {
   return name
     .toLowerCase()
     .replace(/[,]/g, " ")
@@ -158,17 +91,46 @@ function normalize(name: string): string {
     .trim();
 }
 
-export function logoForCompany(name: string | null | undefined): string | null {
-  if (!name) return null;
-  const key = normalize(name);
-  if (FILE_BY_KEY[key]) return `/company_logos/${FILE_BY_KEY[key]}`;
-  // Try a looser match: drop "the", "inc", "llc", "corp", etc.
-  const stripped = key
+// Drops corporate suffixes so "Acme Group" can match an "Acme" row.
+function stripSuffixes(key: string): string {
+  return key
     .replace(/\b(the|inc|llc|ltd|corp|corporation|company|co|group|partners)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (stripped !== key && FILE_BY_KEY[stripped]) {
-    return `/company_logos/${FILE_BY_KEY[stripped]}`;
+}
+
+/**
+ * Build the lookup from `companies` rows. Both `company_id` and `display_name`
+ * are indexed, since contact data uses either. Rows without a `logo_path` are
+ * skipped — they simply have no logo yet.
+ */
+export function buildCompanyLogoMap(rows: CompanyLogoRow[]): CompanyLogoMap {
+  const map: CompanyLogoMap = {};
+  for (const row of rows) {
+    if (!row.logo_path) continue;
+    for (const candidate of [row.company_id, row.display_name]) {
+      if (!candidate) continue;
+      const key = normalizeCompanyName(candidate);
+      if (key) map[key] = row.logo_path;
+    }
   }
+  // Point each known spelling variant at whatever its canonical company resolved to.
+  for (const [variant, canonical] of Object.entries(NAME_ALIASES)) {
+    const target = map[normalizeCompanyName(canonical)];
+    if (target && !map[variant]) map[variant] = target;
+  }
+  return map;
+}
+
+/** Resolve a company name to a logo path, or null when it has no logo. */
+export function logoForCompany(
+  name: string | null | undefined,
+  map: CompanyLogoMap,
+): string | null {
+  if (!name) return null;
+  const key = normalizeCompanyName(name);
+  if (map[key]) return map[key];
+  const stripped = stripSuffixes(key);
+  if (stripped !== key && map[stripped]) return map[stripped];
   return null;
 }

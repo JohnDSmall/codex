@@ -8,9 +8,15 @@ import {
   strengthBadgeClass,
   strengthLabel,
 } from "@/lib/relationship";
-import { logoForCompany } from "@/lib/company-logos";
+import { logoForCompany, type CompanyLogoMap } from "@/lib/company-logos";
 
-export function RelationshipCard({ contact }: { contact: Contact }) {
+export function RelationshipCard({
+  contact,
+  companyLogos,
+}: {
+  contact: Contact;
+  companyLogos: CompanyLogoMap;
+}) {
   const name = displayName(contact);
   const days = daysToContact(contact);
   const lastContact = formatDateLong(contact.last_contact_date);
@@ -52,7 +58,7 @@ export function RelationshipCard({ contact }: { contact: Contact }) {
       {companies.length > 0 && (
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           {companies.map((c) => (
-            <CompanyLogo key={c} name={c} />
+            <CompanyLogo key={c} name={c} companyLogos={companyLogos} />
           ))}
           {extraCompanies > 0 && (
             <span className="inline-flex h-12 items-center rounded-lg bg-neutral-100 dark:bg-neutral-800 px-2.5 text-sm font-medium text-neutral-500">
@@ -110,8 +116,8 @@ function DaysBox({ days }: { days: number | null }) {
   );
 }
 
-function CompanyLogo({ name }: { name: string }) {
-  const logo = logoForCompany(name);
+function CompanyLogo({ name, companyLogos }: { name: string; companyLogos: CompanyLogoMap }) {
+  const logo = logoForCompany(name, companyLogos);
   return (
     <span
       title={name}

@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { loadAllContacts } from "@/lib/contacts-server";
+import { loadCompanyLogoMap } from "@/lib/company-logos-server";
 import { RelationshipsList } from "../components/RelationshipsList";
 
 export const dynamic = "force-dynamic";
 
 export default async function RelationshipsPage() {
-  const contacts = await loadAllContacts();
+  const [contacts, companyLogos] = await Promise.all([
+    loadAllContacts(),
+    loadCompanyLogoMap(),
+  ]);
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <header className="flex items-end justify-between gap-4 flex-wrap">
@@ -32,7 +36,7 @@ export default async function RelationshipsPage() {
         </div>
       </header>
 
-      <RelationshipsList contacts={contacts} />
+      <RelationshipsList contacts={contacts} companyLogos={companyLogos} />
     </div>
   );
 }

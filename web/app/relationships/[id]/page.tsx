@@ -13,6 +13,7 @@ import {
   strengthLabel,
 } from "@/lib/relationship";
 import { logoForCompany } from "@/lib/company-logos";
+import { loadCompanyLogoMap } from "@/lib/company-logos-server";
 import {
   ArrowLeft,
   Bell,
@@ -38,7 +39,10 @@ export default async function RelationshipDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contact = await loadContactById(id);
+  const [contact, companyLogos] = await Promise.all([
+    loadContactById(id),
+    loadCompanyLogoMap(),
+  ]);
   if (!contact) notFound();
 
   const name = displayName(contact);
@@ -247,7 +251,7 @@ export default async function RelationshipDetailPage({
             <Card title="Companies" icon={<Users className="w-4 h-4" />}>
               <div className="flex flex-wrap gap-1.5">
                 {cardCompanies(contact).map((c) => {
-                  const logo = logoForCompany(c);
+                  const logo = logoForCompany(c, companyLogos);
                   return (
                     <span
                       key={c}

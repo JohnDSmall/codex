@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Contact, StrengthTier } from "@/lib/types";
+import type { CompanyLogoMap } from "@/lib/company-logos";
 import { displayName } from "@/lib/relationship";
 import { RelationshipCard } from "./RelationshipCard";
 
@@ -102,7 +103,13 @@ function isOverdue(c: Contact): boolean {
   return new Date(c.target_contact_date + "T00:00:00").getTime() < Date.now();
 }
 
-export function RelationshipsList({ contacts }: { contacts: Contact[] }) {
+export function RelationshipsList({
+  contacts,
+  companyLogos,
+}: {
+  contacts: Contact[];
+  companyLogos: CompanyLogoMap;
+}) {
   const [query, setQuery] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("name");
   const [tracked, setTracked] = useState<TrackedFilter>("tracked");
@@ -211,7 +218,7 @@ export function RelationshipsList({ contacts }: { contacts: Contact[] }) {
                 href={`/relationships/${c.id}`}
                 className="block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl"
               >
-                <RelationshipCard contact={c} />
+                <RelationshipCard contact={c} companyLogos={companyLogos} />
               </Link>
             ))}
           </div>
