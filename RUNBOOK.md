@@ -1,7 +1,9 @@
 # codex — Runbook
 
 Operational runbook for the `codex` repo (personal life-organization apps).
-Verified working on this machine 2026-07-25.
+Verified working on this machine 2026-07-25; re-verified 2026-08-01 (both apps started clean, all
+routes 200, figures below re-read from the running apps). Company-logo resolution reworked
+2026-08-02 — see [company logos](#company-logos).
 
 - **Repo:** https://github.com/JohnDSmall/codex
 - **Local clone:** `C:\Users\Cameron Corse\projects\codex`
@@ -15,27 +17,32 @@ Verified working on this machine 2026-07-25.
 
 ---
 
-## ⚠️ START HERE — state as of 2026-07-25
+## ⚠️ START HERE — state as of 2026-08-02
 
-**Two actions are outstanding:** push to GitHub, and rotate the Supabase key. Everything else is done
-and verified.
+**Two actions are outstanding:**
 
-### 1. Push to GitHub (COMMITTED BUT NOT PUSHED)
+1. **Rotate the Supabase key** (see below).
+2. **Apply `20260624000000_relationship_sqs_flags.sql`.** The migration table in this runbook claimed
+   it was applied. It is not — `contacts.sqs`, `.fundraising`, `.consulting` and `.hiring` all return
+   `42703: column does not exist` against the live DB (verified 2026-08-02). Nothing in `web/` reads
+   those columns yet, so nothing is currently broken by their absence.
 
-The session's work is in three commits on `main` — the `financials/`→`ephemeris/` rename, the merged
-web app, and the wealth-snapshots rebuild — but `git push` fails:
+The push is done.
 
-```
-remote: Invalid username or token. Password authentication is not supported for Git operations.
-```
+### 1. Push to GitHub — ✅ DONE
 
-Git Credential Manager holds a stale GitHub credential and `gh` is **not installed** on this machine.
-GCM can't prompt from a non-interactive shell, so the push has to be run from an interactive terminal.
-If it still fails, clear the stored credential first — Windows **Credential Manager → Windows
-Credentials → `git:https://github.com`** → Remove — then push again and sign in fresh.
+`main` is in sync with `origin/main` at `08829e5` ("Runbook: wealth-snapshots applied, and
+clipboard/push caveats"). All four commits of the 2026-07-25 session are pushed. Working tree is clean
+apart from one untracked file, `PRD-orrery.md`.
 
-Note that `RUNBOOK.md` names the Supabase project ref and dashboard URL. No keys, but it does identify
-the project in a public repo. Scrub to `<project-ref>` first if that matters.
+*Previously blocked by:* Git Credential Manager holding a stale GitHub credential (`remote: Invalid
+username or token`), with `gh` **not installed** on this machine. If a push fails that way again, run it
+from an interactive terminal — GCM can't prompt from a non-interactive shell — and if that still fails,
+clear the credential at Windows **Credential Manager → Windows Credentials → `git:https://github.com`**
+→ Remove, then push again and sign in fresh.
+
+Note that `RUNBOOK.md` names the Supabase project ref and dashboard URL, and this is a public repo. No
+keys, but it does identify the project. Scrub to `<project-ref>` if that matters.
 
 ### 2. Rotate the Supabase service key
 
@@ -58,11 +65,9 @@ If port 3000 is stuck held by an orphaned process, see Gotcha 7.
 >
 > **Live as of 2026-07-25.** Migration applied, 289 rows exported to Supabase, all 7 screens verified against the Flask originals. The Flask app remains as a fallback and still owns the CSV importers.
 
-> **Wealth snapshots applied 2026-07-25.** `/wealth` is out of fallback mode — header reads
-> `6 accounts · 24 dated readings · latest 2025-11-28`, write buttons present. The backfill produced
-> exactly 4 readings per account (18 from `eoy_values`, 6 from `current_value`), every account's newest
-> snapshot equals its `current_value`, and net worth reconciles to **$249,100**. Carry-forward verified
-> against the rendered history at all 7 dates.
+> **Wealth snapshots applied 2026-07-25.** `/wealth` is out of fallback mode (`pendingMigration:
+> false`), write buttons present. A full set of balances was then recorded on **2026-07-25**, which is
+> the current state — see [wealth — dated history](#wealth--dated-history) for the live figures.
 >
 > **Expect a trough in the chart around Oct–Nov 2025 — it is a measurement artifact, not a loss.** BA
 > Savings was re-valued down on 2025-10-20 (103,428 → 11,800) but Schwab was not re-valued up until
@@ -259,9 +264,9 @@ curl -s -o /dev/null -w "%{http_code}\n" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"     # 200 = good, 401 = bad key
 ```
 
-### Route status (verified 2026-07-25, no credentials present)
+### Route status (re-verified 2026-08-01)
 
-All routes verified **200** with credentials in place (2026-07-25), except `/financials` which correctly **307**s to `/ephemeris`. Without `.env.local`, every Supabase-backed route 500s at import time instead.
+All 15 routes below verified **200** with credentials in place (2026-07-25, again 2026-08-01), except `/financials` which correctly **307**s to `/ephemeris`. Without `.env.local`, every Supabase-backed route 500s at import time instead.
 
 Also present: `/relationships/new`, `/relationships/[id]`, `/relationships/[id]/edit` — all Supabase-backed.
 
@@ -274,6 +279,68 @@ done
 ```
 
 Supabase-touching modules: `lib/supabase-server.ts`, `lib/actions.ts`, `lib/contacts-server.ts`, `lib/projects-server.ts`, `lib/wealth-server.ts`.
+
+---
+
+## Company logos
+
+Reworked 2026-08-02. **`companies.logo_path` in Supabase is the source of truth** for which image a
+company uses. `lib/company-logos.ts` used to hardcode a name→filename map; it no longer names a single
+file.
+
+| File | Role |
+|---|---|
+| `lib/company-logos.ts` | `NAME_ALIASES` (spelling variants), `buildCompanyLogoMap()`, `logoForCompany()`. Pure and synchronous — safe to import from Client Components. |
+| `lib/company-logos-server.ts` | `loadCompanyLogoMap()` — reads `companies` from Supabase. |
+
+### Why the map is passed as a prop
+
+`RelationshipsList` is a Client Component, so `logoForCompany()` runs in the browser and **cannot be
+async**. The map is therefore loaded in the Server Component and passed down:
+
+```
+app/relationships/page.tsx        (server) ─┐
+app/relationships/[id]/page.tsx   (server) ─┴─> loadCompanyLogoMap()
+  └─> RelationshipsList (client) ─> RelationshipCard ─> CompanyLogo
+```
+
+Keep `company-logos.ts` free of `server-only` imports or it will break the client bundle. The full
+map (~114 entries, a few KB) is serialized into the client payload on `/relationships` — fine at this
+size, but it is the reason to add a `logo_path IS NOT NULL` filter if `companies` ever grows large.
+
+`loadCompanyLogoMap()` **never throws** — on a Supabase error it logs and returns `{}`, so pages
+render the `Building2` placeholder instead of 500ing. Same principle as `/wealth` degrading when
+`wealth_snapshots` is missing.
+
+### NAME_ALIASES
+
+Maps a spelling variant to a **canonical company name**, not to a file — e.g. `mvw` → `Marriott
+Vacation Worldwide`. The lookup indexes both `company_id` and `display_name`, so an alias is only
+needed when contact data spells a company differently than its `companies` row. Add one when a
+contact's `organization` / `primary_company` / `company_tags` value doesn't match.
+
+### Adding a logo
+
+1. Drop the file in `web/public/company_logos/`.
+2. Set `logo_path` on that company row to `/company_logos/<file>` — extension must match the file on
+   disk exactly.
+3. Add a `NAME_ALIASES` entry only if contact data uses a different spelling.
+
+No code change is needed for step 1–2. **The extension really does matter:** eight rows had `.jpeg`
+recorded for files that are actually `.jfif` or `.jpg` (Audacious Ventures, Circle, Citadel, DC
+Advisory, DelMorgan, Halo, IDEA Center, Salt AI) — corrected 2026-08-02. Four of those were invisible
+before the rework because the old hardcoded map carried the right filename.
+
+### Coverage as of 2026-08-02
+
+**114 of 179** companies resolve a logo, up from 84. The other 65 have no image at all — exported to
+`~/Documents/codex-companies-missing-logos.csv` (company, sector, sub-sector, contact reference
+count).
+
+Two assignments are worth eyeballing: the DB gives `gt.png` to **Greenburg Traurig** and `chs.png` to
+**Chathan Road Capital**, while the old hardcoded map gave those same files to Grant Thornton and CHS.
+One of each pair is wrong. Also, `Avande` is the canonical `company_id` for what is really **Avanade**
+— aliased around rather than renamed, since it's a primary key.
 
 ---
 
@@ -380,6 +447,41 @@ Don't delete `ephemeris/` until step 2 has run and you've confirmed the numbers 
 `/wealth` tracks accounts over time. **Every update is dated** — that's the whole point of the design,
 and the reason the original schema wasn't sufficient.
 
+### Current state (read from the running app, 2026-08-01)
+
+Header: `6 accounts · 30 dated readings · latest 2026-07-25`. Net worth **$296,800**, total liabilities
+**$0** (there are no liability rows and no targets). Change card: **+$47,700 / +19.1% since Nov 28,
+2025**.
+
+| Account | Category | Value @ 2026-07-25 |
+|---|---|---|
+| Charles Schwab Investment Portfolio | investment | $251,000 |
+| Fidelity 401k | investment | $27,000 |
+| BA Checking | cash | $15,800 |
+| BA Savings | cash | $3,000 |
+| Vanguard 401k | investment | $0 |
+| I-Bond | investment | $0 |
+
+Vanguard 401k and I-Bond were both taken to **$0** on 2026-07-25 (from 46,000 and 11,500). Their
+history is intact — they still contribute to every earlier point in the chart.
+
+Net worth at each of the 8 dated points, with carry-forward applied:
+
+| Date | Net worth | What moved |
+|---|---|---|
+| 2022-12-31 | $147,944 | eoy backfill |
+| 2023-12-31 | $180,568 | eoy backfill |
+| 2024-12-31 | $222,250 | eoy backfill |
+| 2025-10-20 | $134,348 | BA Savings ↓, Vanguard, I-Bond — start of the trough |
+| 2025-11-01 | $132,100 | BA Checking → 15,000 |
+| 2025-11-13 | $239,600 | Schwab → 155,300 — trough closes |
+| 2025-11-28 | $249,100 | Fidelity → 9,500 |
+| 2026-07-25 | $296,800 | all 6 accounts re-valued |
+
+Re-verified 2026-08-01: every account has exactly 5 readings (30 total), each account's newest snapshot
+equals its `current_value`, the six current values sum to $296,800, and all 8 history points reconcile
+under carry-forward.
+
 ### Why it was rebuilt
 
 `wealth_items` stores history as `eoy_values`, a jsonb map of `year -> value`: one snapshot per calendar
@@ -406,7 +508,8 @@ The migration converts existing state into dated readings, `on conflict do nothi
 2. Each `current_value` → a snapshot at its `date_updated` (runs second, so a same-date collision keeps
    the eoy row).
 
-Expect roughly **4 readings per account** immediately after.
+Expect roughly **4 readings per account** immediately after. (Each account now has 5 — the backfill's 4
+plus the 2026-07-25 update.)
 
 ### Carry-forward — the subtle bit
 
@@ -446,12 +549,21 @@ Seven migrations in `supabase/migrations/`. There is no local Supabase stack and
 | `20260525124020_relationship_fields.sql` | ✅ |
 | `20260525132435_relationship_extras.sql` | ✅ |
 | `20260525150000_companies_projects_wealth.sql` | ✅ |
-| `20260624000000_relationship_sqs_flags.sql` | ✅ |
+| `20260624000000_relationship_sqs_flags.sql` | ❌ **NOT applied** — see below |
 | `20260725120000_ephemeris_financials.sql` | ✅ applied 2026-07-25 |
 | `20260725160000_wealth_snapshots.sql` | ✅ applied 2026-07-25 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
+
+**The SQS-flags row was marked ✅ in error.** Verified 2026-08-02 against the live DB: `contacts.sqs`,
+`.fundraising`, `.consulting` and `.hiring` all return `42703: column … does not exist`. Check a
+migration by selecting one of its columns before trusting this table:
+
+```bash
+curl -s "$SUPABASE_URL/rest/v1/contacts?select=sqs&limit=1" \
+  -H "apikey: $KEY" -H "Authorization: Bearer $KEY"   # 42703 = not applied
+```
 
 **Getting a migration onto the clipboard:** run this yourself in an interactive terminal —
 
@@ -506,6 +618,8 @@ codex/
 │   │   ├── financials/         redirect stub -> /ephemeris
 │   │   └── components/ephemeris/   ui, Charts, Filters, nav, row actions
 │   ├── lib/            server-side data access (*-server.ts hit Supabase)
+│   │   ├── company-logos.ts        aliases + pure lookup (client-safe)
+│   │   ├── company-logos-server.ts loads companies.logo_path
 │   │   ├── ephemeris-server.ts   queries, filters, subscription detection
 │   │   ├── ephemeris-actions.ts  Server Actions: add/delete + sub overrides
 │   │   ├── wealth-server.ts      snapshots, carry-forward history, summaries
@@ -514,8 +628,9 @@ codex/
 │   ├── node_modules/   gitignored
 │   ├── .env.local.example      committed template
 │   └── .env.local      gitignored — YOU MUST CREATE THIS
+├── PRD-orrery.md       untracked — not committed as of 2026-08-01
 ├── contacts/           one-off Python loaders → Supabase
-├── supabase/migrations/  5 SQL migrations
+├── supabase/migrations/  7 SQL migrations
 └── ephemeris/
     ├── app.py                  Flask routes + dashboard logic (~697 lines)
     ├── db.py                   schema, DB_PATH, default tags/categories
@@ -566,9 +681,31 @@ There are **no tests** and **no lint/CI config** in this repo. Verification = th
 
 ---
 
+## Change log — 2026-08-02 session
+
+1. **Company logos are now database-driven.** Deleted the hardcoded filename map in
+   `lib/company-logos.ts`; `companies.logo_path` is the source of truth. What remains is
+   `NAME_ALIASES` (spelling variants → canonical company name) plus a pure lookup. Added
+   `lib/company-logos-server.ts`. Threaded the map through `relationships/page.tsx` →
+   `RelationshipsList` → `RelationshipCard`, and into `relationships/[id]/page.tsx`.
+   Coverage **84 → 114** of 179 companies.
+2. **Corrected 8 `logo_path` extensions** in Supabase (`.jpeg` recorded for files that are `.jfif` /
+   `.jpg`). Four were latent — they only became visible once the DB started driving rendering.
+3. **Exported the 65 companies with no logo** to `~/Documents/codex-companies-missing-logos.csv`.
+4. **Found the migration table wrong:** `20260624000000_relationship_sqs_flags.sql` was marked applied
+   but is not. Corrected above; the migration still needs running.
+
+Verified: `tsc --noEmit` clean, `npm run lint` clean, `npm run build` succeeds, routes 200, and an
+old-vs-new resolution diff across all 319 company names in the data — **0 lost, 0 changed, 36
+gained.** That diff is the check that matters; a route returning 200 says nothing about whether a
+logo rendered.
+
+---
+
 ## Change log — 2026-07-25 session
 
-Everything below is **uncommitted** in the working tree.
+Everything below is **committed and pushed** — `main` == `origin/main` == `08829e5` (confirmed
+2026-08-01).
 
 1. **Cloned** the repo to `~/projects/codex`; got the Flask app running and wrote this runbook.
 2. **Renamed** `financials/` → `ephemeris/` (via `git mv`, history preserved) and `financials.db` →
@@ -579,7 +716,7 @@ Everything below is **uncommitted** in the working tree.
    entry renamed Financials → Ephemeris, `/financials` → 307 redirect. New Supabase `eph_*` tables +
    `export_to_supabase.py`. Migration applied, 289 rows exported, all totals verified against Flask.
 5. **Rebuilt `/wealth`** for dated history: `wealth_snapshots` table, backfill, carry-forward chart,
-   update/add UI, per-account history. **Migration still pending.**
+   update/add UI, per-account history. Migration **applied** 2026-07-25; balances recorded the same day.
 
 ### Verification standards used
 
