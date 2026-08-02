@@ -19,7 +19,7 @@ routes 200, figures below re-read from the running apps). Company-logo resolutio
 
 ## ⚠️ START HERE — state as of 2026-08-02
 
-**One action is outstanding:** rotate the Supabase key. The push is done, and all seven migrations
+**One action is outstanding:** rotate the Supabase key. The push is done, and all eight migrations
 are now applied.
 
 ### 1. Push to GitHub — ✅ DONE
@@ -272,6 +272,80 @@ done
 ```
 
 Supabase-touching modules: `lib/supabase-server.ts`, `lib/actions.ts`, `lib/contacts-server.ts`, `lib/projects-server.ts`, `lib/wealth-server.ts`.
+
+---
+
+## projects — edit, create, and the hours/revenue link
+
+Built 2026-08-02. `/projects` was a read-only card grid; it now has full CRUD plus a per-project hour
+log and revenue attribution.
+
+| Route | What |
+|---|---|
+| `/projects` | Card grid, filters, header totals, **New project** |
+| `/projects/[id]` | Detail: KPIs, hour log, linked revenue, edit/delete |
+| `/projects/[id]/edit` | Full edit form |
+| `/projects/new` | Create |
+
+| File | Role |
+|---|---|
+| `lib/projects-server.ts` | `loadProjectsWithTotals`, `loadProjectDetail`, `loadProjectById`, `loadClientSuggestions` |
+| `lib/projects-actions.ts` | Server Actions: project CRUD, `logProjectHours`, `linkIncome`/`unlinkIncome`, `addProjectIncome` |
+| `app/components/ProjectForm.tsx` | Create + edit form (shared) |
+| `app/components/ProjectHoursPanel.tsx` | Hour log table, add, unlink, delete |
+| `app/components/ProjectIncomePanel.tsx` | Linked revenue, "link existing" picker, record income |
+
+### Hours and revenue are DERIVED — do not write them
+
+`projects.hours_spent`, `projects.revenue` and `projects.hours_remaining` are **no longer written by
+the app and no longer displayed.** Every hours/revenue figure is summed at read time from rows whose
+`project_id` points at the project:
+
+- **Hours** → `eph_hours.project_id`
+- **Revenue** → `eph_income.project_id`
+
+Both columns are nullable — attribution is optional, and an unlinked row is still a valid row. The FK
+is `on delete set null`, so **deleting a project unlinks its history rather than destroying it.**
+
+The stored columns still hold the pre-link manual figures. They are surfaced only as a muted
+"recorded before linking existed" line on a project whose log is empty, so no number silently
+disappeared. Editing them is deliberately not possible — fix the underlying hour/income rows instead.
+
+`estimated_hours`, `projected_revenue`, `cost` and the action counters remain manual: they are
+targets, not actuals.
+
+### Degradation
+
+`loadProjectsWithTotals` treats a missing `project_id` column (`42703` / `PGRST204`) as "no links
+yet": totals read zero, an amber banner names the migration, and the logging controls hide. `/projects`
+never 500s on a pending migration — same rule as `/wealth`.
+
+### The backfill and what it left alone
+
+Migration `20260802120000_project_links.sql` linked **103 of 128 rows** by one mechanical rule:
+candidates matched on client (via an explicit alias list — `"7 Shot Tennis"`→`"7Shot Tennis"`,
+`"Powered By Halo"`→`"Halo"`), narrowed to the single project whose `[start_date, due_date]` window
+contains the row's date. No amount matching, no fuzzy names. Guarded by `project_id is null`, so it is
+re-runnable and never overwrites a manual link.
+
+Deliberately left unlinked (25 rows) — assign them in the UI:
+
+| Rows | Why |
+|---|---|
+| 9 h "ND Tennis Alumni" | closest project is client "Notre Dame Alumni" — a guess, not a match |
+| 16 h "Real Time Strategist", 6.5 h "Drop The List", 1 h "UTR" | no project exists for these |
+| 2 h Backcountry 2026 | outside every Backcountry project's window |
+| $13,000 Halo | outside both Halo projects' windows |
+| $1,000 Ukraine Global Scholars, $1,350 XX-Ali-Walton, $800 Backcountry | no client match / two overlapping windows |
+
+**Where derived totals differ from the old stored numbers, the derived figure is the one backed by
+rows.** The clearest case: the rule moved **$2,500 of 7Shot revenue** from *Analytics Platform MVP*
+(now $7,500, was $10,000) to *Platform Ops 2023-2024* (now $20,669, was $18,169) — a payment dated
+just after the MVP project's `due_date` of 2022-09-30. If that payment really belonged to the MVP,
+relink it on the project page; the date windows are what decided it.
+
+Verified 2026-08-02: linked 65.5 h + unlinked 42.0 h = 107.5 h total, and linked $133,046 + unlinked
+$16,150 = $149,196 total — both reconcile against the raw tables, with no orphaned `project_id`.
 
 ---
 
@@ -532,7 +606,7 @@ that regression happened once during this session and this is the fix.
 
 ## supabase — schema
 
-Seven migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Eight migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -545,6 +619,7 @@ Seven migrations in `supabase/migrations/`. There is no local Supabase stack and
 | `20260624000000_relationship_sqs_flags.sql` | ✅ applied 2026-08-02 — see below |
 | `20260725120000_ephemeris_financials.sql` | ✅ applied 2026-07-25 |
 | `20260725160000_wealth_snapshots.sql` | ✅ applied 2026-07-25 |
+| `20260802120000_project_links.sql` | ✅ applied 2026-08-02 — DDL via SQL editor, backfill via REST |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
@@ -617,6 +692,8 @@ codex/
 │   ├── lib/            server-side data access (*-server.ts hit Supabase)
 │   │   ├── company-logos.ts        aliases + pure lookup (client-safe)
 │   │   ├── company-logos-server.ts loads companies.logo_path
+│   │   ├── projects-server.ts     projects + derived hour/revenue totals
+│   │   ├── projects-actions.ts    Server Actions: CRUD, log hours, link income
 │   │   ├── ephemeris-server.ts   queries, filters, subscription detection
 │   │   ├── ephemeris-actions.ts  Server Actions: add/delete + sub overrides
 │   │   ├── wealth-server.ts      snapshots, carry-forward history, summaries
@@ -694,10 +771,20 @@ There are **no tests** and **no lint/CI config** in this repo. Verification = th
    via the SQL editor and verified all four columns exist. All seven migrations are now genuinely
    applied.
 
+5. **Projects became editable** (`/projects/[id]`, `/edit`, `/new`) with a per-project hour log and
+   revenue attribution. Added `project_id` to `eph_hours` and `eph_income`
+   (`20260802120000_project_links.sql`), backfilled 103 of 128 rows, and made hours/revenue derived
+   rather than stored. See [projects](#projects--edit-create-and-the-hoursrevenue-link).
+
 Verified: `tsc --noEmit` clean, `npm run lint` clean, `npm run build` succeeds, routes 200, and an
 old-vs-new resolution diff across all 319 company names in the data — **0 lost, 0 changed, 36
 gained.** That diff is the check that matters; a route returning 200 says nothing about whether a
-logo rendered.
+logo rendered. For projects: totals reconcile against the raw tables (65.5 + 42.0 = 107.5 h;
+$133,046 + $16,150 = $149,196), no orphaned `project_id`.
+
+**Not yet exercised against live data:** create / edit / delete project, log hours, link income. They
+typecheck, build, and their read paths render, but no write was performed — that would have put test
+rows in the live database.
 
 ---
 

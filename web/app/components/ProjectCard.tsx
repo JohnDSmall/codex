@@ -1,5 +1,5 @@
 import { Calendar, Clock, DollarSign, Users } from "lucide-react";
-import type { Project } from "@/lib/projects-server";
+import type { ProjectWithTotals } from "@/lib/projects-server";
 
 function fmtMoney(n: number): string {
   if (!n) return "$0";
@@ -18,7 +18,7 @@ function fmtDate(d: string | null): string | null {
   }
 }
 
-function statusBadgeClass(s: Project["status"]): string {
+function statusBadgeClass(s: ProjectWithTotals["status"]): string {
   switch (s) {
     case "active":
       return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
@@ -40,15 +40,18 @@ function priorityClass(p: string): string {
   return "text-neutral-500";
 }
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project }: { project: ProjectWithTotals }) {
   const due = fmtDate(project.due_date);
+  // Hours and revenue come from linked eph_hours / eph_income rows, not from
+  // the stored columns.
+  const { hoursLogged, revenueLinked } = project.totals;
   const actionPct =
     project.total_actions > 0
       ? Math.round((project.completed_actions / project.total_actions) * 100)
       : 0;
   const hoursPct =
     project.estimated_hours > 0
-      ? Math.min(100, Math.round((project.hours_spent / project.estimated_hours) * 100))
+      ? Math.min(100, Math.round((hoursLogged / project.estimated_hours) * 100))
       : 0;
   return (
     <div className="h-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-sm transition-all">
@@ -79,8 +82,8 @@ export function ProjectCard({ project }: { project: Project }) {
         <div>
           <dt className="text-neutral-500 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Revenue</dt>
           <dd className="font-medium tabular-nums">
-            {fmtMoney(project.revenue)}
-            {project.projected_revenue > project.revenue && (
+            {fmtMoney(revenueLinked)}
+            {project.projected_revenue > revenueLinked && (
               <span className="text-neutral-400"> / {fmtMoney(project.projected_revenue)}</span>
             )}
           </dd>
@@ -88,7 +91,7 @@ export function ProjectCard({ project }: { project: Project }) {
         <div>
           <dt className="text-neutral-500 flex items-center gap-1"><Clock className="w-3 h-3" /> Hours</dt>
           <dd className="font-medium tabular-nums">
-            {project.hours_spent}
+            {hoursLogged.toFixed(1)}
             {project.estimated_hours > 0 && (
               <span className="text-neutral-400"> / {project.estimated_hours}</span>
             )}

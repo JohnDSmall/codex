@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Project } from "@/lib/projects-server";
+import Link from "next/link";
+import type { ProjectWithTotals } from "@/lib/projects-server";
 import { ProjectCard } from "./ProjectCard";
 
-type StatusFilter = "all" | Project["status"];
+type StatusFilter = "all" | ProjectWithTotals["status"];
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All statuses" },
@@ -15,7 +16,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "abandoned", label: "Abandoned" },
 ];
 
-function matches(p: Project, q: string): boolean {
+function matches(p: ProjectWithTotals, q: string): boolean {
   if (!q) return true;
   const needle = q.toLowerCase();
   const hay = [
@@ -31,7 +32,7 @@ function matches(p: Project, q: string): boolean {
   return hay.includes(needle);
 }
 
-export function ProjectsList({ projects }: { projects: Project[] }) {
+export function ProjectsList({ projects }: { projects: ProjectWithTotals[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
 
@@ -91,7 +92,13 @@ export function ProjectsList({ projects }: { projects: Project[] }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((p) => (
-            <ProjectCard key={p.id} project={p} />
+            <Link
+              key={p.id}
+              href={`/projects/${p.id}`}
+              className="block focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl"
+            >
+              <ProjectCard project={p} />
+            </Link>
           ))}
         </div>
       )}
