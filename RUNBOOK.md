@@ -19,15 +19,8 @@ routes 200, figures below re-read from the running apps). Company-logo resolutio
 
 ## ⚠️ START HERE — state as of 2026-08-02
 
-**Two actions are outstanding:**
-
-1. **Rotate the Supabase key** (see below).
-2. **Apply `20260624000000_relationship_sqs_flags.sql`.** The migration table in this runbook claimed
-   it was applied. It is not — `contacts.sqs`, `.fundraising`, `.consulting` and `.hiring` all return
-   `42703: column does not exist` against the live DB (verified 2026-08-02). Nothing in `web/` reads
-   those columns yet, so nothing is currently broken by their absence.
-
-The push is done.
+**One action is outstanding:** rotate the Supabase key. The push is done, and all seven migrations
+are now applied.
 
 ### 1. Push to GitHub — ✅ DONE
 
@@ -549,16 +542,20 @@ Seven migrations in `supabase/migrations/`. There is no local Supabase stack and
 | `20260525124020_relationship_fields.sql` | ✅ |
 | `20260525132435_relationship_extras.sql` | ✅ |
 | `20260525150000_companies_projects_wealth.sql` | ✅ |
-| `20260624000000_relationship_sqs_flags.sql` | ❌ **NOT applied** — see below |
+| `20260624000000_relationship_sqs_flags.sql` | ✅ applied 2026-08-02 — see below |
 | `20260725120000_ephemeris_financials.sql` | ✅ applied 2026-07-25 |
 | `20260725160000_wealth_snapshots.sql` | ✅ applied 2026-07-25 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
 
-**The SQS-flags row was marked ✅ in error.** Verified 2026-08-02 against the live DB: `contacts.sqs`,
-`.fundraising`, `.consulting` and `.hiring` all return `42703: column … does not exist`. Check a
-migration by selecting one of its columns before trusting this table:
+**The SQS-flags row carried a ✅ for over a month without having been run.** Caught 2026-08-02 —
+`contacts.sqs`, `.fundraising`, `.consulting` and `.hiring` all returned `42703: column … does not
+exist` — and applied the same day via the SQL editor. All four columns now exist and are null on
+every row; nothing in `web/` reads them yet.
+
+The lesson is that this table is a claim, not evidence. Check a migration by selecting one of its
+columns before trusting the tick:
 
 ```bash
 curl -s "$SUPABASE_URL/rest/v1/contacts?select=sqs&limit=1" \
@@ -692,8 +689,10 @@ There are **no tests** and **no lint/CI config** in this repo. Verification = th
 2. **Corrected 8 `logo_path` extensions** in Supabase (`.jpeg` recorded for files that are `.jfif` /
    `.jpg`). Four were latent — they only became visible once the DB started driving rendering.
 3. **Exported the 65 companies with no logo** to `~/Documents/codex-companies-missing-logos.csv`.
-4. **Found the migration table wrong:** `20260624000000_relationship_sqs_flags.sql` was marked applied
-   but is not. Corrected above; the migration still needs running.
+4. **Found the migration table wrong and fixed the underlying gap:**
+   `20260624000000_relationship_sqs_flags.sql` was marked applied but had never been run. Applied it
+   via the SQL editor and verified all four columns exist. All seven migrations are now genuinely
+   applied.
 
 Verified: `tsc --noEmit` clean, `npm run lint` clean, `npm run build` succeeds, routes 200, and an
 old-vs-new resolution diff across all 319 company names in the data — **0 lost, 0 changed, 36
