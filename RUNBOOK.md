@@ -42,15 +42,22 @@ keys, but it does identify the project. Scrub to `<project-ref>` if that matters
 `web/.env.local` holds a working service-role key that was pasted into a chat transcript. Rotate it at
 Project Settings → API when convenient and update the file. Project ref: `qwkdjxzgqrnbzrohaekg`.
 
-### 3. Dev servers won't survive a session restart
+### 3. Dev servers won't survive a session restart — or an agent turn
 
-Both were started as background tasks. Restart with:
+Restart with:
 
 ```powershell
 cd "C:\Users\Cameron Corse\projects\codex\web";       npm run dev              # :3000
 cd "C:\Users\Cameron Corse\projects\codex\ephemeris"; .\.venv\Scripts\python.exe app.py   # :5000
 ```
 If port 3000 is stuck held by an orphaned process, see Gotcha 7.
+
+**A dev server started as an agent background task is reaped when that turn
+ends** — observed four times on 2026-08-02/03, every time with a clean log (`✓ Ready`, all requests
+200, no crash). An earlier guess that `npm run build` was killing it is **wrong**; the fourth death
+followed no build at all. An agent can still start one and verify against it inside a single turn,
+which is how the route checks in this runbook were made. **If you want a server that stays up while
+you click around, start it yourself in your own terminal.**
 
 > **Renamed 2026-07-25:** `financials/` → `ephemeris/`, and `financials.db` → `ephemeris.db`. If you have an older clone or a backed-up DB under the old name, rename the file to `ephemeris.db` or `seed.py` will build a fresh empty one.
 
