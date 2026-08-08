@@ -293,7 +293,11 @@ Beyond internal transfers it also drops **account-verification micro-deposits**:
 `ACCTVERIFY`, `Transfer PEOPLE CENTER`, and `DES:BVC` — four rows totalling $0.21 that are not income.
 
 Run 2026-08-08 over `Checking_All.csv` + `Savings_All.csv` (2025-02-10 → 2026-08-07): 51 matched,
-**42 gaps imported ($66,722.15)**, 5 unrecognised, 6 DB-only. Re-running now reports 0 gaps.
+**42 gaps imported ($66,722.15)**, 5 unrecognised, 6 DB-only. A second pass then imported the 3
+deposits you attributed by hand ($3,900.00), leaving 2 unrecognised — both known duplicates. Re-running
+now reports 0 gaps.
+
+`eph_income` stands at **145 rows, $348,847.18**, 2022-04-04 → 2026-07-31, every row tagged.
 
 | Added | Rows | Amount |
 |---|---:|---:|
@@ -312,19 +316,25 @@ Expense Reimbursement.
 arrived as one payroll deposit and the split is not in the bank data. Left as Salary under the
 standing rule (a bonus inside the semi-monthly band stays Salary).
 
-### Deposits that cannot be attributed
+### Deposits attributed by hand
 
-Cheque and branch deposits carry no counterparty, so the importer never guesses them. Still
-unattributed:
+Cheque and branch deposits carry no counterparty, so there is nothing to pattern-match on and the
+importer never guesses. Ones you have identified live in `ATTRIBUTED_DEPOSITS` in
+`reconcile_income.js`, keyed on `date|amount`, so a re-run reproduces them instead of dropping them
+back into `UNRECOGNISED`:
 
-| Date | Amount | Memo |
+| Date | Amount | Attribution |
 |---|---:|---|
-| 2025-08-14 | $2,750.00 | `BOFA FIN CTR … 2077 Broadway New York NY` |
-| 2025-12-29 | $1,000.00 | `BKOFAMERICA MOBILE … DEPOSIT` |
-| 2025-11-03 | $150.00 | `BKOFAMERICA MOBILE … DEPOSIT` |
+| 2025-08-14 | $2,750.00 | Expense Reimbursement (branch deposit, 2077 Broadway NY) — no company assigned |
+| 2025-12-29 | $1,000.00 | Misc — gift |
+| 2025-11-03 | $150.00 | Misc — gift |
+
+Add to that map rather than patching rows by hand; a row inserted outside the importer will reappear
+as a gap on the next run.
 
 **Two further mobile deposits are near-certain duplicates** of rows already recorded, offset by a day
-or two — the delay between the payment date and depositing the cheque:
+or two — the delay between the payment date and depositing the cheque. They are deliberately **not**
+in `ATTRIBUTED_DEPOSITS`:
 
 | Recorded | Bank |
 |---|---|

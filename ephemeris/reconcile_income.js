@@ -154,9 +154,38 @@ function classify(row) {
       description: `Preferred Rewards ATM fee rebate (${longDate(row.date)})` };
   }
 
-  // Cheque and branch deposits carry no counterparty -- never guessed.
+  // Cheque and branch deposits carry no counterparty, so they can only be
+  // attributed by being told. Anything not listed above stays unrecognised.
+  const explicit = ATTRIBUTED_DEPOSITS[`${row.date}|${row.amount.toFixed(2)}`];
+  if (explicit) return explicit;
+
   return null;
 }
+
+/**
+ * Deposits attributed by hand, keyed on date|amount. Cheque and branch deposits
+ * name no counterparty, so there is nothing to pattern-match on -- these are
+ * recorded here so a re-run reproduces the same result instead of dropping them
+ * back into UNRECOGNISED.
+ *
+ * NOT listed, deliberately: the 2025-03-17 and 2025-04-30 $867.00 mobile
+ * deposits. Those are the 7 Shot Tennis payments already recorded on 03-15 and
+ * 04-29, deposited a day or two later. Importing them would double-count.
+ */
+const ATTRIBUTED_DEPOSITS = {
+  "2025-12-29|1000.00": {
+    type: "Misc", company: null,
+    description: "Gift, deposited by mobile cheque (29 Dec 2025)",
+  },
+  "2025-11-03|150.00": {
+    type: "Misc", company: null,
+    description: "Gift, deposited by mobile cheque (3 Nov 2025)",
+  },
+  "2025-08-14|2750.00": {
+    type: "Expense Reimbursement", company: null,
+    description: "Expense reimbursement, deposited at the 2077 Broadway branch, New York (14 Aug 2025)",
+  },
+};
 
 /**
  * company_id -> eph_tags name. An imported row with a null tag_id vanishes into
