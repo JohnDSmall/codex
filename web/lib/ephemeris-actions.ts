@@ -70,6 +70,8 @@ export async function addIncome(formData: FormData) {
     description: required(formData, "description"),
     amount: money(formData, "amount"),
     client: str(formData, "client"),
+    // FK to companies.company_id; blank stays null (interest, tax refunds).
+    company_id: str(formData, "company_id"),
     tag_id: str(formData, "tag_id"),
     notes: str(formData, "notes"),
     income_type: str(formData, "income_type"),

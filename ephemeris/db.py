@@ -97,8 +97,7 @@ DEFAULT_TAGS = [
     "Freelance Consulting", # legacy — pre-source-split
     "Halo",
     "Snorkel",
-    "HAI",
-    "Handshake",
+    "Handshake AI",         # merged 2026-08-08 — was "Handshake" + "HAI"
     "7 Shot Tennis",
     "Other",
 ]

@@ -274,9 +274,48 @@ Imported 44 rows, `$129,029.03`, against the statements' own summary lines:
 not overlap the historical rows — those end 2025-07-28 — so the import was purely additive and the 52
 project links on the old rows are untouched.
 
-**Still outstanding:** the 56 pre-2026 rows have `income_type` and `company_id` null. Categorizing
-them needs 2022–2025 statements; the credit-card CSVs won't help, since income only comes from the
-two BofA accounts.
+### Tags: the rollup gotcha
+
+**An imported row with no `tag_id` silently lands in "Untagged" on the dashboard.** The first import
+left all 44 rows untagged, so `$129,029.03` — more than the entire pre-2026 history — sat in a bucket
+nobody looks at, and the rollup looked broken. `loadDashboard()` is not at fault; it buckets null to
+`"Untagged"` by design. **Always set `tag_id` when importing.**
+
+Tags now applied: Handshake rows → `Handshake AI`, the company-less Misc rows (interest, tax refunds)
+→ `Personal`.
+
+**`Handshake` and `HAI` were merged into one `Handshake AI` tag** on 2026-08-08 (both were unused by
+any row, so nothing needed re-pointing). `DEFAULT_TAGS` in `ephemeris/db.py` was updated to match —
+otherwise `seed.py` recreates the old names on the next run.
+
+### The tag does NOT identify the company
+
+Worth stating plainly, because it is the obvious wrong assumption: for 45 of the 56 pre-2026 rows the
+tag is `Freelance Consulting`, a generic bucket covering four different clients. Only `Halo` maps 1:1.
+**`client` is what identifies the company**, and it is what the backfill used.
+
+| `client` | → `company_id` | Type | Rows | Amount |
+|---|---|---|---:|---:|
+| Powered By Halo | `Halo` | *pending* | 11 | $108,000.00 |
+| 7 Shot Tennis | `7 Shot Tennis` | Contract | 34 | $33,371.00 |
+| Backcountry Academics | `Backcountry Academics` | Contract | 9 | $5,475.00 |
+| XX-Ali-Walton | — | — | 1 | $1,350.00 |
+| Ukraine Global Scholars | — | — | 1 | $1,000.00 |
+
+The last two match none of the five companies and were left null rather than guessed.
+
+### UI
+
+`/ephemeris/income` shows **Type** and **Company** columns, with filter rows for each that combine
+with the tag filter. All are plain `GET` links, so they work without JS and stack:
+`?type=Contract&company=7%20Shot%20Tennis`. `?company=none` selects rows with no company.
+`INCOME_TYPES` in `lib/ephemeris-server.ts` must match the CHECK constraint — Postgres, not the form,
+is what rejects a bad value.
+
+**Still outstanding:** the 11 Halo rows have `company_id` set but no Type — exported to
+`~/Documents/codex-halo-income-to-categorize.csv` for you to fill in the `income_type_FILL_ME`
+column. Categorizing anything further back needs 2022–2025 BofA statements; the credit-card CSVs
+won't help, since income only comes from the two BofA accounts.
 
 ---
 

@@ -29,10 +29,18 @@ export type Income = {
   description: string;
   amount: number;
   client: string | null;
+  /** FK to companies.company_id; null where no company applies. */
+  company_id: string | null;
   tag_id: string | null;
   notes: string | null;
   income_type: string | null;
   tag_name: string | null;
+};
+
+export type IncomeFilters = {
+  tag: string | null;
+  type: string | null;
+  company: string | null;
 };
 
 export type Asset = {
@@ -59,7 +67,18 @@ export type HoursRow = {
   tag_name: string | null;
 };
 
-export const INCOME_TYPES = ["Salary", "Bonus", "Reimbursement"] as const;
+/**
+ * The closed list enforced by the `eph_income_income_type_check` constraint.
+ * Keep in step with migration 20260808120000 — a value not in the constraint
+ * is rejected by Postgres, not by the form.
+ */
+export const INCOME_TYPES = [
+  "Contract",
+  "Salary",
+  "Bonus",
+  "Expense Reimbursement",
+  "Misc",
+] as const;
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -250,13 +269,21 @@ export async function loadAllExpenses(): Promise<Expense[]> {
 
 /* ---------------------------------------------------------------- income */
 
-export async function loadIncome(tagId?: string | null): Promise<Income[]> {
+export async function loadIncome(
+  tagId?: string | null,
+  filters?: Partial<IncomeFilters>,
+): Promise<Income[]> {
   const rows = await fetchAll<Record<string, unknown>>(() => {
-    const q = supabaseAdmin
+    let q = supabaseAdmin
       .from("eph_income")
       .select("*, tag:eph_tags(name)")
       .order("date", { ascending: false });
-    return (tagId ? q.eq("tag_id", tagId) : q) as never;
+    if (tagId) q = q.eq("tag_id", tagId);
+    if (filters?.type) q = q.eq("income_type", filters.type);
+    // "none" is how the UI asks for rows with no company (interest, tax refunds).
+    if (filters?.company === "none") q = q.is("company_id", null);
+    else if (filters?.company) q = q.eq("company_id", filters.company);
+    return q as never;
   });
   return rows.map((r) => ({
     id: String(r.id),
@@ -264,11 +291,28 @@ export async function loadIncome(tagId?: string | null): Promise<Income[]> {
     description: String(r.description ?? ""),
     amount: num(r.amount),
     client: (r.client as string | null) ?? null,
+    company_id: (r.company_id as string | null) ?? null,
     tag_id: (r.tag_id as string | null) ?? null,
     notes: (r.notes as string | null) ?? null,
     income_type: (r.income_type as string | null) ?? null,
     tag_name: relName(r.tag),
   }));
+}
+
+/**
+ * Companies offerable on an income row: those already used by income, plus the
+ * canonical set. Keeps the picker short instead of listing all ~180 companies,
+ * while any of them remains valid for the FK.
+ */
+export async function loadIncomeCompanyOptions(): Promise<string[]> {
+  const canonical = ["7 Shot Tennis", "Backcountry Academics", "Halo", "Handshake AI", "Snorkel"];
+  const { data, error } = await supabaseAdmin
+    .from("eph_income")
+    .select("company_id")
+    .not("company_id", "is", null);
+  if (error) return canonical;
+  const used = new Set((data ?? []).map((r) => String((r as { company_id: string }).company_id)));
+  return [...new Set([...canonical, ...used])].sort((a, b) => a.localeCompare(b));
 }
 
 /* ---------------------------------------------------------------- assets */
