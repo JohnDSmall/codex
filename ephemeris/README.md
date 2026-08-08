@@ -8,9 +8,11 @@ Part of [codex](../). See [RUNBOOK.md](../RUNBOOK.md) for full operational detai
 
 > **This app has been merged into the Next.js web app** at [`web/app/ephemeris`](../web/app/ephemeris) → `/ephemeris`, backed by Supabase.
 >
-> This Flask version is still here because it remains the **data source of record** until you apply
-> `supabase/migrations/20260725120000_ephemeris_financials.sql` and run `export_to_supabase.py`.
-> It also still owns the CSV importers, which write only to SQLite.
+> The migration was applied and 289 rows were exported on 2026-07-25, so **Supabase is now the source
+> of record** and this Flask app is a legacy fallback / historical snapshot.
+>
+> It still owns the **CSV importers**, which write only to SQLite. If you import here, re-run
+> `export_to_supabase.py` afterwards or the web app will not see the new rows.
 
 ## Tags
 

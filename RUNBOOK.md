@@ -1,9 +1,12 @@
 # codex — Runbook
 
 Operational runbook for the `codex` repo (personal life-organization apps).
-Verified working on this machine 2026-07-25; re-verified 2026-08-01 (both apps started clean, all
-routes 200, figures below re-read from the running apps). Company-logo resolution reworked
-2026-08-02 — see [company logos](#company-logos).
+Verified working on this machine 2026-07-25, re-verified 2026-08-01 and **2026-08-08** (all 21 web
+routes 200, figures below re-read from the running app and from PostgREST).
+
+Recent structural changes: company-logo resolution is now database-driven
+([company logos](#company-logos)), and projects are fully editable with a derived hour/revenue log
+([projects](#projects--edit-create-and-the-hoursrevenue-link)).
 
 - **Repo:** https://github.com/JohnDSmall/codex
 - **Local clone:** `C:\Users\Cameron Corse\projects\codex`
@@ -13,11 +16,20 @@ routes 200, figures below re-read from the running apps). Company-logo resolutio
 | `web/` | Next.js 16.2.6 / React 19.2.4 | Supabase (remote) | ✅ working — `.env.local` is populated |
 | `ephemeris/` | Flask 3.0.3 | SQLite (local file) | ✅ working — **legacy fallback**, still owns the CSV importers |
 | `contacts/` | Python loaders | writes to Supabase | ⚠️ needs env vars, not yet run |
-| `supabase/` | 7 SQL migrations | — | schema definition only |
+| `supabase/` | 8 SQL migrations | — | schema definition only, all applied |
+
+### Live figures (2026-08-08)
+
+| | |
+|---|---|
+| Contacts | ~1,186 |
+| Companies | 180, of which **122** resolve a logo |
+| Projects | 14 · 65.5 h logged · $133,046 revenue linked |
+| Net worth | $296,800 across 6 accounts, 30 dated readings |
 
 ---
 
-## ⚠️ START HERE — state as of 2026-08-02
+## ⚠️ START HERE — state as of 2026-08-08
 
 **One action is outstanding:** rotate the Supabase key. The push is done, and all eight migrations
 are now applied.
@@ -264,21 +276,40 @@ curl -s -o /dev/null -w "%{http_code}\n" \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY"     # 200 = good, 401 = bad key
 ```
 
-### Route status (re-verified 2026-08-01)
+### Route status (re-verified 2026-08-08)
 
-All 15 routes below verified **200** with credentials in place (2026-07-25, again 2026-08-01), except `/financials` which correctly **307**s to `/ephemeris`. Without `.env.local`, every Supabase-backed route 500s at import time instead.
+All **21** routes below verified **200**, except `/financials` which correctly **307**s to
+`/ephemeris`. Without `.env.local`, every Supabase-backed route 500s at import time instead.
 
-Also present: `/relationships/new`, `/relationships/[id]`, `/relationships/[id]/edit` — all Supabase-backed.
+The dynamic routes need a real id, so the snippet fetches one first — an earlier version of this
+smoke test only covered static paths and so never exercised `/projects/[id]` or
+`/relationships/[id]`, the two places most likely to break.
 
 ```bash
-for p in / /financials /goals /planner /ephemeris /ephemeris/spending /ephemeris/subscriptions \
-         /ephemeris/expenses /ephemeris/income /ephemeris/assets /ephemeris/hours \
-         /projects /wealth /relationships /relationships/dashboard; do
+cd "C:\Users\Cameron Corse\projects\codex\web"
+KEY=$(grep '^SUPABASE_SERVICE_KEY=' .env.local | cut -d= -f2- | tr -d '"'\''\r')
+URL=$(grep '^SUPABASE_URL=' .env.local | cut -d= -f2- | tr -d '"'\''\r')
+CID=$(curl -s "$URL/rest/v1/contacts?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+PID=$(curl -s "$URL/rest/v1/projects?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+
+for p in / /financials /goals /planner \
+         /ephemeris /ephemeris/spending /ephemeris/subscriptions /ephemeris/expenses \
+         /ephemeris/income /ephemeris/assets /ephemeris/hours \
+         /projects /projects/new "/projects/$PID" "/projects/$PID/edit" \
+         /wealth /relationships /relationships/dashboard /relationships/new \
+         "/relationships/$CID" "/relationships/$CID/edit"; do
   echo "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$p")  $p"
 done
 ```
 
-Supabase-touching modules: `lib/supabase-server.ts`, `lib/actions.ts`, `lib/contacts-server.ts`, `lib/projects-server.ts`, `lib/wealth-server.ts`.
+**A 200 is not proof the page is right.** It says the route rendered, not that it rendered data —
+`/ephemeris/expenses` returns 200 with zero rows by default (Gotcha 1), and a logo or a project total
+can be silently absent behind a perfectly healthy 200. Check the figure you changed.
+
+Supabase-touching modules: `lib/supabase-server.ts`, `lib/actions.ts`, `lib/contacts-server.ts`,
+`lib/company-logos-server.ts`, `lib/projects-server.ts`, `lib/projects-actions.ts`,
+`lib/ephemeris-server.ts`, `lib/ephemeris-actions.ts`, `lib/wealth-server.ts`,
+`lib/wealth-actions.ts`.
 
 ---
 
@@ -446,8 +477,14 @@ only one Handshake contact instead of five. `selectAll()` in `lib/contacts-serve
 pattern.
 
 When rewriting `company_tags`, dedupe: a contact can already carry the target name, and a blind
-replace leaves it twice. There is still no `companies` row for **Handshake AI**, so it renders
-without a logo — add one if you want a logo to attach.
+replace leaves it twice.
+
+**Ephemeris tags are a separate namespace and were deliberately not touched.** `eph_tags` (and
+`DEFAULT_TAGS` in `ephemeris/db.py`) still carry **`Handshake`** and **`HAI`** as life-area buckets on
+expenses/income/hours. Those are financial tags, not company references, and renaming one would
+re-tag historical rows. If you want them aligned with the company naming, that is a separate,
+deliberate change — rename in `eph_tags`, and in `DEFAULT_TAGS` so `seed.py` doesn't recreate the old
+name.
 
 ---
 
@@ -728,7 +765,14 @@ codex/
 │   ├── app/
 │   │   ├── ephemeris/          the merged financial app (layout + 7 pages)
 │   │   ├── financials/         redirect stub -> /ephemeris
-│   │   └── components/ephemeris/   ui, Charts, Filters, nav, row actions
+│   │   ├── projects/           list + [id] detail + [id]/edit + new
+│   │   ├── relationships/      list + dashboard + [id] + [id]/edit + new
+│   │   └── components/
+│   │       ├── ephemeris/          ui, Charts, Filters, nav, row actions
+│   │       ├── ProjectForm.tsx     shared by /projects/new and /edit
+│   │       ├── ProjectHoursPanel.tsx    hour log: add, unlink, delete
+│   │       ├── ProjectIncomePanel.tsx   revenue: link existing, record new
+│   │       └── ProjectCard.tsx / ProjectsList.tsx / DeleteProjectButton.tsx
 │   ├── lib/            server-side data access (*-server.ts hit Supabase)
 │   │   ├── company-logos.ts        aliases + pure lookup (client-safe)
 │   │   ├── company-logos-server.ts loads companies.logo_path
@@ -738,13 +782,13 @@ codex/
 │   │   ├── ephemeris-actions.ts  Server Actions: add/delete + sub overrides
 │   │   ├── wealth-server.ts      snapshots, carry-forward history, summaries
 │   │   └── wealth-actions.ts     Server Actions: record balances, add/delete
-│   ├── public/company_logos/   ~160 org logos
+│   ├── public/company_logos/   123 org logos (tracked in git — public repo)
 │   ├── node_modules/   gitignored
 │   ├── .env.local.example      committed template
 │   └── .env.local      gitignored — YOU MUST CREATE THIS
-├── PRD-orrery.md       untracked — not committed as of 2026-08-01
+├── PRD-orrery.md       orrery PRD draft (committed 2026-08-02)
 ├── contacts/           one-off Python loaders → Supabase
-├── supabase/migrations/  7 SQL migrations
+├── supabase/migrations/  8 SQL migrations
 └── ephemeris/
     ├── app.py                  Flask routes + dashboard logic (~697 lines)
     ├── db.py                   schema, DB_PATH, default tags/categories
@@ -760,7 +804,11 @@ codex/
     └── ephemeris.db           gitignored
 ```
 
-There are **no tests** and **no lint/CI config** in this repo. Verification = the route smoke test above.
+There are **no tests** and **no lint/CI config** in this repo. Verification is therefore manual, and
+the bar that has actually caught things is: `npx tsc --noEmit` + `npm run lint` + `npm run build`
+clean, the route smoke test above, **and a check of the specific number or element you changed** —
+read back from the running app or straight from PostgREST. Every real bug this repo has surfaced
+(wrong logo paths, a false migration tick, the unpaged 1000-row query) passed a 200.
 
 ---
 
@@ -795,6 +843,24 @@ There are **no tests** and **no lint/CI config** in this repo. Verification = th
 
 ---
 
+## Change log — 2026-08-08 session
+
+1. **Added 8 company logos** from `~/Downloads/logos` (Battery Ventures, Capital Group, Doblin,
+   Oppenheimer, Ruttenberg Gordon, Technifibre / Lacoste, UMass, Handshake AI). Coverage
+   **114 → 122** of 180.
+2. **Standardized two company names** across the live data: `Oppenheimer & Co Inc` → `Oppenheimer`,
+   `Handshake` → `Handshake AI`. See
+   [company-name standardization](#company-name-standardization).
+3. **Created the missing `Handshake AI` company row** — the name was on five contacts but absent from
+   `companies`, so no logo could attach.
+4. **Refreshed this runbook**: route smoke test now covers all 21 routes including the dynamic ones,
+   layout tree updated, live figures added at the top.
+
+The one mistake worth carrying forward: an **unpaged PostgREST query** reported 1 Handshake contact
+when there were 5. Responses cap at 1000 rows; contacts is ~1,186. Always page.
+
+---
+
 ## Change log — 2026-08-02 session
 
 1. **Company logos are now database-driven.** Deleted the hardcoded filename map in
@@ -808,8 +874,8 @@ There are **no tests** and **no lint/CI config** in this repo. Verification = th
 3. **Exported the 65 companies with no logo** to `~/Documents/codex-companies-missing-logos.csv`.
 4. **Found the migration table wrong and fixed the underlying gap:**
    `20260624000000_relationship_sqs_flags.sql` was marked applied but had never been run. Applied it
-   via the SQL editor and verified all four columns exist. All seven migrations are now genuinely
-   applied.
+   via the SQL editor and verified all four columns exist. That closed the last gap among the seven
+   migrations then in the repo; `20260802120000_project_links.sql` (item 5) made it eight.
 
 5. **Projects became editable** (`/projects/[id]`, `/edit`, `/new`) with a per-project hour log and
    revenue attribution. Added `project_id` to `eph_hours` and `eph_income`
