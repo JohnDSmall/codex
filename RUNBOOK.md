@@ -405,16 +405,43 @@ recorded for files that are actually `.jfif` or `.jpg` (Audacious Ventures, Circ
 Advisory, DelMorgan, Halo, IDEA Center, Salt AI) — corrected 2026-08-02. Four of those were invisible
 before the rework because the old hardcoded map carried the right filename.
 
-### Coverage as of 2026-08-02
+### Coverage as of 2026-08-08
 
-**114 of 179** companies resolve a logo, up from 84. The other 65 have no image at all — exported to
-`~/Documents/codex-companies-missing-logos.csv` (company, sector, sub-sector, contact reference
-count).
+**121 of 179** companies resolve a logo (84 before the rework, 114 after it, +7 added 2026-08-08).
+The other 58 have no image at all — exported to `~/Documents/codex-companies-missing-logos.csv`
+(company, sector, sub-sector, contact reference count). Regenerate that file after adding logos.
+
+Added 2026-08-08 from `~/Downloads/logos`: Battery Ventures, Capital Group, Doblin, Oppenheimer,
+Ruttenberg Gordon Investments, Technifibre / Lacoste, University of Massachusetts. Source files were
+named `*_logo.ext`; the `_logo` suffix is dropped on copy to match the existing naming.
 
 Two assignments are worth eyeballing: the DB gives `gt.png` to **Greenburg Traurig** and `chs.png` to
 **Chathan Road Capital**, while the old hardcoded map gave those same files to Grant Thornton and CHS.
 One of each pair is wrong. Also, `Avande` is the canonical `company_id` for what is really **Avanade**
 — aliased around rather than renamed, since it's a primary key.
+
+### Company-name standardization
+
+`companies.company_id` is a text primary key that *is* the company name on most rows (`display_name`
+is often null and the app falls back to the id). Renaming a company therefore means updating the PK,
+and separately updating every contact that stores the old string in `organization`,
+`primary_company` or `company_tags` — those are free text, not foreign keys, so nothing cascades.
+
+Done 2026-08-08:
+
+| Change | Touched |
+|---|---|
+| `Oppenheimer & Co Inc` → `Oppenheimer` | 1 `companies` row (PK), 1 contact |
+| `Handshake` → `Handshake AI` | 4 contacts (1 `primary_company`, 3 `company_tags`) |
+
+**Scan for name usage with a paged query.** PostgREST caps a response at 1000 rows and there are
+~1,186 contacts, so an unpaged `select` silently misses the tail — that mistake initially reported
+only one Handshake contact instead of five. `selectAll()` in `lib/contacts-server.ts` shows the
+pattern.
+
+When rewriting `company_tags`, dedupe: a contact can already carry the target name, and a blind
+replace leaves it twice. There is still no `companies` row for **Handshake AI**, so it renders
+without a logo — add one if you want a logo to attach.
 
 ---
 
