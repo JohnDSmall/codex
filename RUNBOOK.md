@@ -407,13 +407,19 @@ before the rework because the old hardcoded map carried the right filename.
 
 ### Coverage as of 2026-08-08
 
-**121 of 179** companies resolve a logo (84 before the rework, 114 after it, +7 added 2026-08-08).
+**122 of 180** companies resolve a logo (84 before the rework, 114 after it, +8 added 2026-08-08).
 The other 58 have no image at all — exported to `~/Documents/codex-companies-missing-logos.csv`
 (company, sector, sub-sector, contact reference count). Regenerate that file after adding logos.
 
 Added 2026-08-08 from `~/Downloads/logos`: Battery Ventures, Capital Group, Doblin, Oppenheimer,
-Ruttenberg Gordon Investments, Technifibre / Lacoste, University of Massachusetts. Source files were
-named `*_logo.ext`; the `_logo` suffix is dropped on copy to match the existing naming.
+Ruttenberg Gordon Investments, Technifibre / Lacoste, University of Massachusetts, Handshake AI.
+Source files were named `*_logo.ext`; the `_logo` suffix is dropped on copy to match the existing
+naming.
+
+**Handshake AI had no `companies` row at all** — a name can be all over `contacts` and still be absent
+from the reference table, in which case no logo can ever attach to it. Inserted with `sector: "AI"`,
+matching Anthropic / Reflection AI / Snorkel; `sub_sector` left null rather than guessed. Check for a
+row before assuming a missing logo is just a missing file.
 
 Two assignments are worth eyeballing: the DB gives `gt.png` to **Greenburg Traurig** and `chs.png` to
 **Chathan Road Capital**, while the old hardcoded map gave those same files to Grant Thornton and CHS.
