@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { loadDashboard } from "@/lib/ephemeris-server";
+import {
+  DASHBOARD_RANGES,
+  isDashboardRange,
+  loadDashboard,
+  rangeLabel,
+  type DashboardRange,
+  type RawSearchParams,
+} from "@/lib/ephemeris-server";
 import { CashflowChart, TagBars } from "../components/ephemeris/Charts";
 import {
   Card,
@@ -16,20 +23,48 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function EphemerisOverviewPage() {
-  const d = await loadDashboard();
+export default async function EphemerisOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}) {
+  const sp = await searchParams;
+  const raw = Array.isArray(sp.range) ? sp.range[0] : sp.range;
+  const range: DashboardRange = isDashboardRange(raw) ? raw : "ytd";
+  const label = rangeLabel(range);
+
+  const d = await loadDashboard(range);
   const net = d.totalIncome - d.totalExpenses;
+
+  const chip = (on: boolean) =>
+    "rounded-md px-2.5 py-1 text-xs transition-colors " +
+    (on
+      ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-medium"
+      : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800");
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="Net (all time)" value={fmtMoneyFull(net)} accent tone={net >= 0 ? "positive" : "negative"} />
-        <Kpi label="Total income" value={fmtMoneyFull(d.totalIncome)} />
-        <Kpi label="Total expenses" value={fmtMoneyFull(d.totalExpenses)} />
-        <Kpi label="Assets" value={fmtMoneyFull(d.assetsTotal)} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-neutral-400">Period:</span>
+        {DASHBOARD_RANGES.map((r) => (
+          <Link
+            key={r.value}
+            href={r.value === "ytd" ? "/ephemeris" : `/ephemeris?range=${r.value}`}
+            className={chip(range === r.value)}
+          >
+            {r.label}
+          </Link>
+        ))}
       </div>
 
-      <Card title="Income vs expenses by month">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi label={`Net (${label})`} value={fmtMoneyFull(net)} accent tone={net >= 0 ? "positive" : "negative"} />
+        <Kpi label={`Income (${label})`} value={fmtMoneyFull(d.totalIncome)} />
+        <Kpi label={`Expenses (${label})`} value={fmtMoneyFull(d.totalExpenses)} />
+        <Kpi label="Assets (all time)" value={fmtMoneyFull(d.assetsTotal)} />
+      </div>
+
+      <Card title={`Income vs expenses by month · ${label}`}>
         <CashflowChart data={d.months} />
       </Card>
 
@@ -75,45 +110,72 @@ export default async function EphemerisOverviewPage() {
         </Card>
       </div>
 
-      <Card title="Monthly breakdown" padded={false}>
-        {d.months.length === 0 ? (
-          <div className="p-4">
-            <Empty>No transactions yet.</Empty>
-          </div>
-        ) : (
-          <TableWrap>
-            <table className="w-full text-sm">
-              <thead className="text-xs text-neutral-500">
-                <tr className="text-left">
-                  <Th>Month</Th>
-                  <Th right>Income</Th>
-                  <Th right>Expenses</Th>
-                  <Th right>Net</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.months.map((m) => (
-                  <tr key={m.month} className="border-t border-neutral-100 dark:border-neutral-800">
-                    <Td>{fmtMonth(m.month)}</Td>
-                    <Td right muted={m.income === 0}>{fmtMoneyFull(m.income)}</Td>
-                    <Td right muted={m.expenses === 0}>{fmtMoneyFull(m.expenses)}</Td>
-                    <Td
-                      right
-                      className={
-                        m.net >= 0
-                          ? "text-emerald-600 dark:text-emerald-400 font-medium"
-                          : "text-rose-600 dark:text-rose-400 font-medium"
-                      }
-                    >
-                      {fmtMoneyFull(m.net)}
-                    </Td>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card title={`Income vs expenses · ${label}`} padded={false}>
+          {d.months.length === 0 ? (
+            <div className="p-4">
+              <Empty>No transactions in this period.</Empty>
+            </div>
+          ) : (
+            <TableWrap>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-neutral-500">
+                  <tr className="text-left">
+                    <Th>Month</Th>
+                    <Th right>Income</Th>
+                    <Th right>Expenses</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
-        )}
-      </Card>
+                </thead>
+                <tbody>
+                  {d.months.map((m) => (
+                    <tr key={m.month} className="border-t border-neutral-100 dark:border-neutral-800">
+                      <Td>{fmtMonth(m.month)}</Td>
+                      <Td right muted={m.income === 0}>{fmtMoneyFull(m.income)}</Td>
+                      <Td right muted={m.expenses === 0}>{fmtMoneyFull(m.expenses)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+
+        <Card title={`Net by month · ${label}`} padded={false}>
+          {d.months.length === 0 ? (
+            <div className="p-4">
+              <Empty>No transactions in this period.</Empty>
+            </div>
+          ) : (
+            <TableWrap>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-neutral-500">
+                  <tr className="text-left">
+                    <Th>Month</Th>
+                    <Th right>Net</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.months.map((m) => (
+                    <tr key={m.month} className="border-t border-neutral-100 dark:border-neutral-800">
+                      <Td>{fmtMonth(m.month)}</Td>
+                      <Td
+                        right
+                        className={
+                          m.net >= 0
+                            ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                            : "text-rose-600 dark:text-rose-400 font-medium"
+                        }
+                      >
+                        {fmtMoneyFull(m.net)}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          )}
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card

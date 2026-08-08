@@ -6,7 +6,6 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
   ComposedChart,
   Pie,
   PieChart,
@@ -75,7 +74,11 @@ export function MonthlySpendBars({ data }: { data: { month: string; total: numbe
   );
 }
 
-/** Income vs expenses per month, with net as an overlaid line. */
+/**
+ * Income vs expenses per month. Net is deliberately not overlaid here — it
+ * lives in its own table on the overview, where a single series is easier to
+ * read than a line crossing two bar sets.
+ */
 export function CashflowChart({
   data,
 }: {
@@ -93,15 +96,6 @@ export function CashflowChart({
         <Legend wrapperStyle={{ fontSize: 11 }} />
         <Bar dataKey="income" fill="#10b981" name="Income" radius={[4, 4, 0, 0]} isAnimationActive={false} />
         <Bar dataKey="expenses" fill="#f43f5e" name="Expenses" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-        <Line
-          type="monotone"
-          dataKey="net"
-          stroke="#6366f1"
-          strokeWidth={2}
-          dot={false}
-          name="Net"
-          isAnimationActive={false}
-        />
       </ComposedChart>
     </ResponsiveContainer>
   );

@@ -365,6 +365,79 @@ export async function loadHours(tagId?: string | null): Promise<HoursRow[]> {
 export type TagTotals = { tag: string; income: number; expenses: number; net: number };
 export type MonthRow = { month: string; income: number; expenses: number; net: number };
 
+/* ------------------------------------------------------- dashboard range */
+
+export const DASHBOARD_RANGES = [
+  { value: "ytd", label: "Year to date" },
+  { value: "3m", label: "3 months" },
+  { value: "6m", label: "6 months" },
+  { value: "12m", label: "12 months" },
+  { value: "18m", label: "18 months" },
+  { value: "24m", label: "24 months" },
+  { value: "all", label: "All time" },
+] as const;
+
+export type DashboardRange = (typeof DASHBOARD_RANGES)[number]["value"];
+
+export function isDashboardRange(v: string | null | undefined): v is DashboardRange {
+  return !!v && DASHBOARD_RANGES.some((r) => r.value === v);
+}
+
+export function rangeLabel(range: DashboardRange): string {
+  return DASHBOARD_RANGES.find((r) => r.value === range)?.label ?? "Year to date";
+}
+
+/**
+ * Inclusive first date of a range, or null for all time. The month ranges count
+ * month buckets, not 30-day windows: "3 months" on 2026-08-08 starts
+ * 2026-06-01, so the chart shows three bars (Jun, Jul, the partial Aug).
+ */
+export function rangeStartDate(range: DashboardRange, today = new Date()): string | null {
+  const y = today.getFullYear();
+  const m = today.getMonth(); // 0-based
+  if (range === "all") return null;
+  if (range === "ytd") return `${y}-01-01`;
+  const back = Number(range.replace("m", "")) - 1;
+  const d = new Date(Date.UTC(y, m - back, 1));
+  return d.toISOString().slice(0, 10);
+}
+
+export type IncomeMetrics = {
+  ytd: number;
+  ytdYear: number;
+  /** Mean monthly income over the last 3 *complete* months. */
+  laggingAvgMonthly: number;
+  laggingMonths: string[];
+};
+
+/**
+ * "Complete" excludes the current month, which is always partial and would drag
+ * the average down for most of every month.
+ */
+export async function loadIncomeMetrics(today = new Date()): Promise<IncomeMetrics> {
+  const rows = await loadIncome();
+  const year = today.getFullYear();
+  const ytd = rows
+    .filter((r) => r.date >= `${year}-01-01`)
+    .reduce((s, r) => s + r.amount, 0);
+
+  const months: string[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const d = new Date(Date.UTC(year, today.getMonth() - i, 1));
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const total = rows
+    .filter((r) => months.includes(r.date.slice(0, 7)))
+    .reduce((s, r) => s + r.amount, 0);
+
+  return {
+    ytd,
+    ytdYear: year,
+    laggingAvgMonthly: total / months.length,
+    laggingMonths: months.slice().reverse(),
+  };
+}
+
 export type DashboardData = {
   totalsByTag: TagTotals[];
   assetsTotal: number;
@@ -378,13 +451,21 @@ export type DashboardData = {
   totalExpenses: number;
 };
 
-export async function loadDashboard(): Promise<DashboardData> {
-  const [tags, expenses, income, assets] = await Promise.all([
+export async function loadDashboard(
+  range: DashboardRange = "ytd",
+): Promise<DashboardData> {
+  const [tags, allExpenses, allIncome, assets] = await Promise.all([
     loadTags(),
     loadAllExpenses(),
     loadIncome(),
     loadAssets(),
   ]);
+
+  // Every figure on the overview except assets respects the selected range;
+  // assets are a point-in-time balance, not a flow.
+  const start = rangeStartDate(range);
+  const expenses = start ? allExpenses.filter((e) => e.date >= start) : allExpenses;
+  const income = start ? allIncome.filter((i) => i.date >= start) : allIncome;
 
   const tagNames = tags.map((t) => t.name);
   const blank = () => ({ income: 0, expenses: 0 });

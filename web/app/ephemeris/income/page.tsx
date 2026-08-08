@@ -4,6 +4,7 @@ import {
   INCOME_TYPES,
   loadIncome,
   loadIncomeCompanyOptions,
+  loadIncomeMetrics,
   loadTags,
   type RawSearchParams,
 } from "@/lib/ephemeris-server";
@@ -37,10 +38,11 @@ export default async function IncomePage({
   const activeType = one(sp.type);
   const activeCompany = one(sp.company);
 
-  const [rows, tags, companies] = await Promise.all([
+  const [rows, tags, companies, metrics] = await Promise.all([
     loadIncome(activeTag, { type: activeType, company: activeCompany }),
     loadTags(),
     loadIncomeCompanyOptions(),
+    loadIncomeMetrics(),
   ]);
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const today = new Date().toISOString().slice(0, 10);
@@ -85,9 +87,22 @@ export default async function IncomePage({
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Kpi label="Total income" value={fmtMoneyFull(total)} accent tone="positive" />
-        <Kpi label="Rows" value={String(rows.length)} />
+      {/* YTD and the lagging average ignore the filters above: they are
+          whole-book measures, not a view of the current selection. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Kpi
+          label={`Year to date (${metrics.ytdYear})`}
+          value={fmtMoneyFull(metrics.ytd)}
+          accent
+          tone="positive"
+        />
+        <Kpi
+          label="Lagging avg monthly income"
+          value={fmtMoneyFull(metrics.laggingAvgMonthly)}
+          hint={`mean of ${metrics.laggingMonths.join(", ")}`}
+        />
+        <Kpi label="Total income (filtered)" value={fmtMoneyFull(total)} />
+        <Kpi label="Rows (filtered)" value={String(rows.length)} />
       </div>
 
       <AddPanel title="Add income" action={addIncome}>

@@ -345,8 +345,36 @@ They were **not** imported (they fall in `UNRECOGNISED`, not `GAP`), so nothing 
 it means date+amount matching alone will not catch cheque-lag duplicates. Check `DB-ONLY` against
 `UNRECOGNISED` before importing anything by hand.
 
-The other four `DB-ONLY` rows — Backcountry Academics $300, $450, $225, $250 — have no matching bank
-credit in the window at all.
+The other four `DB-ONLY` rows — Backcountry Academics $300, $450, $225, $250 — **were paid by Venmo**
+and will never appear in a BofA export. They are correct as recorded; expect them to show up as
+`DB-ONLY` on every future reconciliation run, and leave them alone.
+
+### Overview period filter and income KPIs
+
+Added 2026-08-08.
+
+**`/ephemeris` takes `?range=`** — `ytd` (default) · `3m` · `6m` · `12m` · `18m` · `24m` · `all`.
+The KPIs, chart and both monthly tables all honour it; **assets do not**, since a balance is a
+point-in-time figure, not a flow. Ranges count *month buckets*, not 30-day windows: `3m` on
+2026-08-08 starts 2026-06-01 and shows three bars (Jun, Jul, partial Aug).
+
+**Net is no longer overlaid on the income-vs-expenses chart.** It has its own *Net by month* table
+beside the income/expenses table, on the same period. The chart is bars only.
+
+**`/ephemeris/income` carries two whole-book KPIs** that deliberately ignore the tag/type/company
+filters, because they measure the book rather than the current view:
+
+| KPI | Definition |
+|---|---|
+| Year to date | Income dated on or after 1 Jan of the current year |
+| Lagging avg monthly income | Mean income over the last **3 complete** months |
+
+"Complete" excludes the current month, which is partial for most of its life and would otherwise drag
+the average down every month. The KPI's hint names the exact months averaged, so the figure is always
+checkable — e.g. on 2026-08-08 it reads `mean of 2026-05, 2026-06, 2026-07` = $16,724.
+
+The two filtered KPIs beside them (*Total income (filtered)*, *Rows (filtered)*) do follow the
+filters. The labels are the only thing distinguishing them; keep them.
 
 ### Tags: the rollup gotcha
 
