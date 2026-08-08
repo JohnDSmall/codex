@@ -349,6 +349,62 @@ The other four `DB-ONLY` rows — Backcountry Academics $300, $450, $225, $250 �
 and will never appear in a BofA export. They are correct as recorded; expect them to show up as
 `DB-ONLY` on every future reconciliation run, and leave them alone.
 
+## expenses — imported from the bank, not the cards
+
+Added 2026-08-08. `import_bofa_expenses.js`:
+
+```powershell
+node import_bofa_expenses.js --bank <chk.csv> <sav.csv> `
+     --amex <dir> --card <dir> [--apply]
+```
+
+### The model, and why
+
+**An expense is money that actually left the bank.** Card *payments* are therefore the expense, dated
+when paid; card line items are **not** imported as rows. The Amex is shared with a partner, so its
+line items overstate what was personally spent — the payment is the only figure that is truly his.
+
+Card statements are still read, but **only to derive category proportions**: a payment is split across
+categories in the same ratio as that card's charges in the preceding calendar month, using a
+largest-remainder split so the parts sum exactly to the payment. Where no statement covers that
+month the payment stays **uncategorized** rather than guessed.
+
+Categorization rules are parsed out of `CATEGORY_RULES` in `import_csv.py` at runtime — one source of
+truth, rather than a second copy that drifts.
+
+### What is excluded, and the $90,000 lesson
+
+| Excluded | Rows | Amount |
+|---|---:|---:|
+| Internal CHK↔SAV transfers | 10 | $63,300.00 |
+| Transfers to investments | 3 | $105,000.00 |
+
+**BofA labels a brokerage transfer `Online Banking transfer to BRK ####`, with no broker name in the
+memo.** Matching only on broker names (SCHWAB, FIDELITY, …) missed two rows worth **$90,000** and
+inflated Apr/May 2025 spend by 3–5×. The tell was a monthly total that looked absurd, not an error —
+nothing failed. **Always eyeball the monthly series after an import; a wrong number is silent.**
+
+### Result (2026-08-08)
+
+491 rows, **$242,885.74**, reconciling exactly: $411,185.74 of debits − $63,300 internal −
+$105,000 investment. Of that, 383 rows totalling **$117,972.10** are card-payment allocations, which
+sum precisely to the card payments seen in the bank.
+
+`eph_expenses` now holds **652 rows, $265,276.45** — the 491 imported plus the 161 legacy
+spreadsheet rows. Everything is tagged `Personal`; 22 rows ($12,237.75) are uncategorized, all of
+them card payments from before the card statements begin.
+
+### Coverage limits
+
+- **BofA card 7061 statements start 2025-07-28**, but the card was being paid from Feb 2025. Those
+  five months of payments are imported at full value but uncategorized — the itemization does not
+  exist and cannot be exported.
+- Amex statements run 2024-12-27 → 2026-07-18.
+- Everything imported is tagged `Personal`, including business-looking categories such as
+  `F&O - Software & Apps`. These are personal accounts; re-tag if you want them split by life area.
+
+---
+
 ### Overview period filter and income KPIs
 
 Added 2026-08-08.
