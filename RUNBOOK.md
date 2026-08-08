@@ -20,11 +20,16 @@ Recent structural changes: company-logo resolution is now database-driven
 
 ### Live figures (2026-08-08)
 
+All figures are **Supabase**, which is the live data. The SQLite counts under
+[Data](#data) are the frozen Flask seed and are much smaller — don't mix them up.
+
 | | |
 |---|---|
 | Contacts | ~1,186 |
 | Companies | 180, of which **122** resolve a logo |
 | Projects | 14 · 65.5 h logged · $133,046 revenue linked |
+| Income | **145 rows, $348,847.18** · 2022-04-04 → 2026-07-31 |
+| Expenses | **652 rows, $265,276.45** |
 | Net worth | $296,800 across 6 accounts, 30 dated readings |
 
 ---
@@ -164,6 +169,11 @@ curl -s http://127.0.0.1:5000/hours  | grep -c '<tr'                 # 73  = 72 
 
 ## Data
 
+> **Two datasets, don't confuse them.** The counts in this section describe the **SQLite** file behind
+> the Flask app, which has been frozen since the 2026-07-25 export. The live data is in **Supabase**
+> and is now much larger — see [live figures](#live-figures-2026-08-08). A figure like "161 expenses"
+> below is the seed, not the current book.
+
 - **DB file:** `ephemeris/ephemeris.db` (SQLite). **Gitignored** — treated as user data, never committed.
 - **Seed:** `python seed.py` loads hard-coded freelance-spreadsheet rows. **Idempotent** — skips rows already present, safe to re-run. Last run inserted `161 expenses, 56 income, 72 hours`.
 - **Reset from scratch:** stop the app, delete `ephemeris.db`, re-run `seed.py`. This destroys any manually-entered or imported rows, which are *not* in `seed.py`.
@@ -182,6 +192,26 @@ Categories: COGS / F&O / S&M / T&E / R&D / L&A subcategories plus `Personal-*` �
 ---
 
 ## Importers
+
+There are two generations, and they write to **different databases**:
+
+| Importer | Language | Writes to | Use for |
+|---|---|---|---|
+| `import_csv.py` | Python | **SQLite** | legacy card statements (frozen) |
+| `import_checking.py` | Python | **SQLite** | legacy checking deposits (frozen) |
+| [`import_bofa_income.js`](#income--structured-import-from-bofa-statements) | Node | **Supabase** | income, clean non-overlapping window |
+| [`reconcile_income.js`](#reconciling-against-full-history-statements) | Node | **Supabase** | income, overlapping statements |
+| [`import_bofa_expenses.js`](#expenses--imported-from-the-bank-not-the-cards) | Node | **Supabase** | expenses |
+
+**Use the Node ones.** The Python pair write to `ephemeris.db`, which nothing reads any more — the web
+app is backed by Supabase. They are kept because they hold `CATEGORY_RULES` and
+`normalize_merchant()`, which `import_bofa_expenses.js` parses at runtime, and because re-running the
+SQLite path would need a fresh export to reach the live app.
+
+The Node importers need no venv (they read `web/.env.local` for credentials), all dry-run by default,
+are idempotent, and report anything they cannot classify rather than guessing.
+
+### Legacy Python importers
 
 Run from `ephemeris/` with the venv python. Both accept a single CSV **or a directory of CSVs**, and skip duplicates.
 
@@ -270,7 +300,8 @@ Imported 44 rows, `$129,029.03`, against the statements' own summary lines:
 | Checking | $96,347.98 | $63,300.00 | **$33,047.98** ✓ |
 | Savings | $95,981.05 | $0.00 | **$95,981.05** ✓ |
 
-`eph_income` is now **100 rows**: 56 pre-2026 (`$149,196.00`) and 44 in 2026. The 2026 statements do
+*(Figures as of this first import — superseded below once the full-history statements were
+reconciled.)* `eph_income` stood at **100 rows**: 56 pre-2026 (`$149,196.00`) and 44 in 2026. The 2026 statements do
 not overlap the historical rows — those end 2025-07-28 — so the import was purely additive and the 52
 project links on the old rows are untouched.
 
@@ -1057,7 +1088,8 @@ codex/
 │   │   ├── company-logos-server.ts loads companies.logo_path
 │   │   ├── projects-server.ts     projects + derived hour/revenue totals
 │   │   ├── projects-actions.ts    Server Actions: CRUD, log hours, link income
-│   │   ├── ephemeris-server.ts   queries, filters, subscription detection
+│   │   ├── ephemeris-server.ts   queries, filters, subscription detection,
+│   │   │                         dashboard ranges, income KPIs
 │   │   ├── ephemeris-actions.ts  Server Actions: add/delete + sub overrides
 │   │   ├── wealth-server.ts      snapshots, carry-forward history, summaries
 │   │   └── wealth-actions.ts     Server Actions: record balances, add/delete
@@ -1067,8 +1099,13 @@ codex/
 │   └── .env.local      gitignored — YOU MUST CREATE THIS
 ├── PRD-orrery.md       orrery PRD draft (committed 2026-08-02)
 ├── contacts/           one-off Python loaders → Supabase
-├── supabase/migrations/  8 SQL migrations
+├── supabase/migrations/  9 SQL migrations
 └── ephemeris/
+    │   ── Node importers → SUPABASE (current) ──
+    ├── import_bofa_income.js       income, clean window
+    ├── reconcile_income.js         income, overlapping statements + gap report
+    ├── import_bofa_expenses.js     expenses; cards used only for category ratios
+    │   ── Python → SQLITE (frozen; still holds the shared CATEGORY_RULES) ──
     ├── app.py                  Flask routes + dashboard logic (~697 lines)
     ├── db.py                   schema, DB_PATH, default tags/categories
     ├── seed.py                 hard-coded spreadsheet seed data
@@ -1132,11 +1169,32 @@ read back from the running app or straight from PostgREST. Every real bug this r
    [company-name standardization](#company-name-standardization).
 3. **Created the missing `Handshake AI` company row** — the name was on five contacts but absent from
    `companies`, so no logo could attach.
-4. **Refreshed this runbook**: route smoke test now covers all 21 routes including the dynamic ones,
+4. **Restructured income.** Added Type (`income_type`, CHECK-constrained) and Company (`company_id`,
+   FK to `companies`) to `eph_income`; imported the 2026 BofA statements; then reconciled against
+   full-history statements and imported the gaps. **145 rows, $348,847.18**, every row tagged.
+   See [income](#income--structured-import-from-bofa-statements).
+5. **Imported expenses from the bank** — cash-out model, card statements used only for category
+   proportions. **491 rows, $242,885.74**; `eph_expenses` now 652 rows, $265,276.45.
+   See [expenses](#expenses--imported-from-the-bank-not-the-cards).
+6. **Overview period filter** (`?range=`, YTD default), net split into its own table, and two income
+   KPIs (YTD, lagging 3-complete-month average).
+7. **Merged the `Handshake` and `HAI` tags** into `Handshake AI`, and updated `DEFAULT_TAGS`.
+8. **Refreshed this runbook**: route smoke test now covers all 21 routes including the dynamic ones,
    layout tree updated, live figures added at the top.
 
-The one mistake worth carrying forward: an **unpaged PostgREST query** reported 1 Handshake contact
-when there were 5. Responses cap at 1000 rows; contacts is ~1,186. Always page.
+### Three mistakes worth carrying forward
+
+1. **Unpaged PostgREST query** reported 1 Handshake contact when there were 5. Responses cap at 1000
+   rows; contacts is ~1,186. **Always page.**
+2. **Imported rows with a null `tag_id`** — twice, the second time *after* documenting the gotcha.
+   $129k then $67k silently landed in the dashboard's "Untagged" bucket. The fix that worked was
+   moving the guard into code, not prose: the importers now assign a tag and abort if one is missing.
+3. **$90,000 of brokerage transfers counted as spend**, because BofA writes them as
+   `Online Banking transfer to BRK ####` with no broker name. Nothing errored; the only symptom was a
+   monthly total that looked wrong. **Eyeball the monthly series after every import.**
+
+The common thread: none of these threw an error, and every one of them passed a route returning 200.
+Check the number you changed.
 
 ---
 

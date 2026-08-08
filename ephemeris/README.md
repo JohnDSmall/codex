@@ -49,6 +49,18 @@ http://127.0.0.1:5000/expenses?from=&to=
 - `seed.py` — hard-coded freelance spreadsheet rows (expenses, income, hours)
 - `import_csv.py` — credit-card CSV importer + merchant normalization
 - `import_checking.py` — BofA checking CSV importer (deposits → income)
+
+**These two write to SQLite, which nothing reads any more.** The live importers are Node and write
+straight to Supabase — no venv needed, they read `web/.env.local`:
+
+- `import_bofa_income.js` — income from a clean, non-overlapping statement window
+- `reconcile_income.js` — income from statements that overlap existing rows; reports matched / gap /
+  db-only and imports only the gaps
+- `import_bofa_expenses.js` — expenses, using card statements only for category proportions
+
+All three dry-run by default; pass `--apply` to write. `import_csv.py` is still the home of
+`CATEGORY_RULES`, which `import_bofa_expenses.js` parses at runtime so the categorization rules exist
+in one place. See [RUNBOOK.md](../RUNBOOK.md#importers).
 - `migrate_*.py` — one-off idempotent migrations
 - `export_to_supabase.py` — one-off export of this SQLite DB into the Supabase `eph_*` tables
 - `templates/` — Jinja templates
