@@ -274,12 +274,81 @@ Imported 44 rows, `$129,029.03`, against the statements' own summary lines:
 not overlap the historical rows — those end 2025-07-28 — so the import was purely additive and the 52
 project links on the old rows are untouched.
 
+### Reconciling against full-history statements
+
+`import_bofa_income.js` assumes a clean, non-overlapping window. For statements that overlap rows you
+already have, use **`reconcile_income.js`** instead:
+
+```powershell
+node reconcile_income.js <checking.csv> <savings.csv>            # report only
+node reconcile_income.js <checking.csv> <savings.csv> --apply    # insert the gaps
+```
+
+It matches each statement credit against `eph_income` on **date + amount** — not
+`source_account`, because legacy rows have none, and including it would make every historical row
+look like a gap and duplicate it. Output is three buckets: `MATCHED` (skipped), `GAP` (imported), and
+`DB-ONLY` (recorded but absent from the statements — reported, never touched).
+
+Beyond internal transfers it also drops **account-verification micro-deposits**: `Yardi Penny Test`,
+`ACCTVERIFY`, `Transfer PEOPLE CENTER`, and `DES:BVC` — four rows totalling $0.21 that are not income.
+
+Run 2026-08-08 over `Checking_All.csv` + `Savings_All.csv` (2025-02-10 → 2026-08-07): 51 matched,
+**42 gaps imported ($66,722.15)**, 5 unrecognised, 6 DB-only. Re-running now reports 0 gaps.
+
+| Added | Rows | Amount |
+|---|---:|---:|
+| Salary / Snorkel | 13 | $57,401.85 |
+| Expense Reimbursement / Snorkel | 9 | $1,967.62 |
+| Expense Reimbursement / Halo | 6 | $1,100.66 |
+| Salary / Handshake AI | 1 | $5,504.21 |
+| Misc | 13 | $747.81 |
+
+**Snorkel pays on two rails**, exactly like Handshake: `SNORKEL AI DES:PAYROLL` is the semi-monthly
+run (base $3,971.21), and `Snorkel AI Inc DES:<code>` is the reimbursement rail. Halo paid by **Zelle**,
+and the memo states which it is — `for Payment for…` → Contract, `for Expense reimbursement…` →
+Expense Reimbursement.
+
+**2025-10-15 Snorkel `$10,423.01`** is 2.6× the base and almost certainly carries a bonus, but it
+arrived as one payroll deposit and the split is not in the bank data. Left as Salary under the
+standing rule (a bonus inside the semi-monthly band stays Salary).
+
+### Deposits that cannot be attributed
+
+Cheque and branch deposits carry no counterparty, so the importer never guesses them. Still
+unattributed:
+
+| Date | Amount | Memo |
+|---|---:|---|
+| 2025-08-14 | $2,750.00 | `BOFA FIN CTR … 2077 Broadway New York NY` |
+| 2025-12-29 | $1,000.00 | `BKOFAMERICA MOBILE … DEPOSIT` |
+| 2025-11-03 | $150.00 | `BKOFAMERICA MOBILE … DEPOSIT` |
+
+**Two further mobile deposits are near-certain duplicates** of rows already recorded, offset by a day
+or two — the delay between the payment date and depositing the cheque:
+
+| Recorded | Bank |
+|---|---|
+| 2025-03-15 $867.00 *February Payment* [7 Shot Tennis] | 2025-03-17 $867.00 mobile deposit |
+| 2025-04-29 $867.00 *March Payment* [7 Shot Tennis] [7 Shot Tennis] | 2025-04-30 $867.00 mobile deposit |
+
+They were **not** imported (they fall in `UNRECOGNISED`, not `GAP`), so nothing double-counted — but
+it means date+amount matching alone will not catch cheque-lag duplicates. Check `DB-ONLY` against
+`UNRECOGNISED` before importing anything by hand.
+
+The other four `DB-ONLY` rows — Backcountry Academics $300, $450, $225, $250 — have no matching bank
+credit in the window at all.
+
 ### Tags: the rollup gotcha
 
 **An imported row with no `tag_id` silently lands in "Untagged" on the dashboard.** The first import
 left all 44 rows untagged, so `$129,029.03` — more than the entire pre-2026 history — sat in a bucket
 nobody looks at, and the rollup looked broken. `loadDashboard()` is not at fault; it buckets null to
 `"Untagged"` by design. **Always set `tag_id` when importing.**
+
+This then happened a *second* time: `reconcile_income.js` was written without the tagging logic and
+put another $66,722.15 in "Untagged". Both importers now assign a tag from `TAG_FOR_COMPANY`, and
+`reconcile_income.js` **aborts** rather than inserting if a required tag row is missing. Writing the
+gotcha down was not enough — the guard is in the code.
 
 Tags now applied: Handshake rows → `Handshake AI`, the company-less Misc rows (interest, tax refunds)
 → `Personal`.
