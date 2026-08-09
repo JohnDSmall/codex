@@ -810,6 +810,26 @@ Keep that invariant when writing contacts: **if you set `primary_company`, add i
 too**, or the person vanishes from this chart. The match is case-insensitive so `Deloitte` next to
 `deloitte` doesn't create a second bucket.
 
+### Follow-up buckets
+
+`followUpDistribution()` buckets `target_contact_date` into Overdue · Next week · Next month ·
+Next 3 months · Later · None scheduled.
+
+Three choices worth keeping:
+
+1. **Tracked contacts only** (339, not 1,193). Every contact with a `target_contact_date` is tracked;
+   the other ~853 are an untriaged phone import. Counting them would report ~896 "none scheduled" and
+   bury the 43 that genuinely need one.
+2. **A `Later` bucket exists** so the six buckets sum to the tracked total. Without it anyone
+   scheduled beyond 90 days would vanish from the card.
+3. **`today` is passed in, not read inside.** This runs in a Server Component and the result is
+   serialized to the client; calling `new Date()` on both sides is how you get a hydration mismatch.
+
+**The card calls out bulk-stamped dates.** As of 2026-08-09, **264 of the 272 overdue share the date
+2026-02-24** — one stamp, not 272 commitments. Whenever a single date is ≥25% of the overdue pile the
+card says so, so the headline is never read as real work. The same stamp distorts
+`last_contact_date`; see [future improvements](#future-improvements).
+
 ### Competency and connection-strength summaries
 
 Two server-rendered distribution cards on the dashboard (`DistributionCards.tsx`), plain bars rather

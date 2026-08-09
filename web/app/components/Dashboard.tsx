@@ -4,13 +4,14 @@ import { useState } from "react";
 import type { Contact } from "@/lib/types";
 import type {
   CompetencyBucket,
+  FollowUpSummary,
   OrgCount,
   StrengthBucket,
   Summary,
 } from "@/lib/stats";
 import { StatsCards } from "./StatsCards";
 import { TopOrgsChart } from "./TopOrgsChart";
-import { CompetencyCard, StrengthCard } from "./DistributionCards";
+import { CompetencyCard, FollowUpCard, StrengthCard } from "./DistributionCards";
 import { ContactsTable } from "./ContactsTable";
 import { ContactDetail } from "./ContactDetail";
 
@@ -20,6 +21,7 @@ export function Dashboard({
   topOrgs,
   competency,
   strength,
+  followUps,
 }: {
   contacts: Contact[];
   summary: Summary;
@@ -31,6 +33,7 @@ export function Dashboard({
     average: number | null;
   };
   strength: StrengthBucket[];
+  followUps: FollowUpSummary;
 }) {
   const [selected, setSelected] = useState<Contact | null>(null);
 
@@ -44,6 +47,8 @@ export function Dashboard({
       </header>
 
       <StatsCards s={summary} />
+
+      <FollowUpCard summary={followUps} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CompetencyCard

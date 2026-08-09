@@ -1,4 +1,4 @@
-import type { CompetencyBucket, StrengthBucket } from "@/lib/stats";
+import type { CompetencyBucket, FollowUpSummary, StrengthBucket } from "@/lib/stats";
 
 /**
  * Horizontal bars rather than a chart library: these are small, ordered,
@@ -76,6 +76,71 @@ export function CompetencyCard({
         <span className="text-neutral-500">Unrated</span>
         <span className="tabular-nums text-neutral-400">{unrated}</span>
       </div>
+    </div>
+  );
+}
+
+export function FollowUpCard({ summary }: { summary: FollowUpSummary }) {
+  const { buckets, total, bulkStamp } = summary;
+  const max = Math.max(1, ...buckets.map((b) => b.count));
+  const due = buckets.find((b) => b.key === "overdue")?.count ?? 0;
+  const soon =
+    (buckets.find((b) => b.key === "week")?.count ?? 0) +
+    (buckets.find((b) => b.key === "month")?.count ?? 0);
+
+  const tone = (k: string) =>
+    k === "overdue" ? "rose" : k === "none" ? "neutral" : k === "week" ? "amber" : "indigo";
+  const fill: Record<string, string> = {
+    rose: "bg-rose-500",
+    amber: "bg-amber-500",
+    indigo: "bg-indigo-500",
+    neutral: "bg-neutral-400",
+  };
+
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h3 className="font-semibold text-sm">Follow-ups</h3>
+        <span className="text-xs text-neutral-500">{total.toLocaleString()} tracked</span>
+      </div>
+
+      <div className="space-y-1.5">
+        {buckets.map((b) => (
+          <div key={b.key} className="flex items-center gap-3 text-sm">
+            <span className="w-28 shrink-0 text-neutral-600 dark:text-neutral-400">{b.label}</span>
+            <span className="flex-1 h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+              <span
+                className={`block h-full ${fill[tone(b.key)]}`}
+                style={{ width: `${(b.count / max) * 100}%` }}
+              />
+            </span>
+            <span
+              className={
+                "w-12 shrink-0 text-right tabular-nums font-medium " +
+                (b.key === "overdue" && b.count > 0 ? "text-rose-600 dark:text-rose-400" : "")
+              }
+            >
+              {b.count}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {bulkStamp && (
+        // Without this the headline reads as N separate commitments. It is one
+        // bulk-stamped date, and every "days until contact" figure inherits it.
+        <p className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 text-xs text-amber-700 dark:text-amber-300">
+          {bulkStamp.count} of the {due} overdue share the date {bulkStamp.date} — a bulk stamp
+          rather than {bulkStamp.count} separate commitments. Re-date them and this number becomes
+          meaningful.
+        </p>
+      )}
+
+      {!bulkStamp && due + soon > 0 && (
+        <p className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 text-xs text-neutral-500">
+          {due} overdue, {soon} due within the month.
+        </p>
+      )}
     </div>
   );
 }

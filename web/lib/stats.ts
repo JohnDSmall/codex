@@ -87,6 +87,84 @@ export function strengthDistribution(contacts: Contact[]): StrengthBucket[] {
   }));
 }
 
+export type FollowUpBucket = {
+  key: "overdue" | "week" | "month" | "quarter" | "later" | "none";
+  label: string;
+  count: number;
+};
+
+export type FollowUpSummary = {
+  buckets: FollowUpBucket[];
+  /** Population the buckets are drawn from — tracked contacts only. */
+  total: number;
+  /** Set when one date dominates the overdue pile, i.e. it was bulk-stamped. */
+  bulkStamp: { date: string; count: number } | null;
+};
+
+/**
+ * Follow-ups by when they are due.
+ *
+ * Counted over **tracked** contacts only. Every contact that has a
+ * `target_contact_date` is tracked, and the other ~853 are an untriaged phone
+ * import — including them would report ~896 "no follow-up scheduled" and drown
+ * the 43 that actually need one.
+ *
+ * Buckets are mutually exclusive and include `later`, so they sum to the
+ * tracked total. Without it, anyone scheduled beyond 90 days would silently
+ * vanish from the card.
+ *
+ * `today` is passed in rather than read here: this runs in a Server Component
+ * and the result is serialized to the client, so calling `new Date()` on both
+ * sides would be a hydration mismatch waiting to happen.
+ */
+export function followUpDistribution(contacts: Contact[], today: Date): FollowUpSummary {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const shift = (n: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + n);
+    return iso(d);
+  };
+  const t = iso(today), week = shift(7), month = shift(30), quarter = shift(90);
+
+  const tracked = contacts.filter((c) => c.tracked);
+  const counts = new Map<FollowUpBucket["key"], number>();
+  const overdueDates = new Map<string, number>();
+  const bump = (k: FollowUpBucket["key"]) => counts.set(k, (counts.get(k) ?? 0) + 1);
+
+  for (const c of tracked) {
+    const d = c.target_contact_date;
+    if (!d) { bump("none"); continue; }
+    if (d < t) {
+      bump("overdue");
+      overdueDates.set(d, (overdueDates.get(d) ?? 0) + 1);
+    } else if (d < week) bump("week");
+    else if (d < month) bump("month");
+    else if (d < quarter) bump("quarter");
+    else bump("later");
+  }
+
+  const overdue = counts.get("overdue") ?? 0;
+  const worst = [...overdueDates.entries()].sort((a, b) => b[1] - a[1])[0];
+  // A single date accounting for most of the overdue pile is a bulk stamp, not
+  // a queue. Surfacing it stops the headline number being read as real work.
+  const bulkStamp = worst && overdue > 0 && worst[1] / overdue >= 0.25
+    ? { date: worst[0], count: worst[1] }
+    : null;
+
+  return {
+    buckets: [
+      { key: "overdue", label: "Overdue", count: overdue },
+      { key: "week", label: "Next week", count: counts.get("week") ?? 0 },
+      { key: "month", label: "Next month", count: counts.get("month") ?? 0 },
+      { key: "quarter", label: "Next 3 months", count: counts.get("quarter") ?? 0 },
+      { key: "later", label: "Later", count: counts.get("later") ?? 0 },
+      { key: "none", label: "None scheduled", count: counts.get("none") ?? 0 },
+    ],
+    total: tracked.length,
+    bulkStamp,
+  };
+}
+
 export type Summary = {
   total: number;
   withPhone: number;

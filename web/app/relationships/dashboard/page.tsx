@@ -2,6 +2,7 @@ import Link from "next/link";
 import { loadAllContacts } from "@/lib/contacts-server";
 import {
   competencyDistribution,
+  followUpDistribution,
   strengthDistribution,
   summarize,
   topOrganizations,
@@ -16,6 +17,8 @@ export default async function NetworkDashboardPage() {
   const orgs = topOrganizations(contacts);
   const competency = competencyDistribution(contacts);
   const strength = strengthDistribution(contacts);
+  // Computed here, in the Server Component, so the client never calls new Date().
+  const followUps = followUpDistribution(contacts, new Date());
   return (
     <div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
@@ -32,6 +35,7 @@ export default async function NetworkDashboardPage() {
         topOrgs={orgs}
         competency={competency}
         strength={strength}
+        followUps={followUps}
       />
     </div>
   );
