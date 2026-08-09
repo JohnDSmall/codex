@@ -365,6 +365,82 @@ export async function loadHours(tagId?: string | null): Promise<HoursRow[]> {
 export type TagTotals = { tag: string; income: number; expenses: number; net: number };
 export type MonthRow = { month: string; income: number; expenses: number; net: number };
 
+/* ---------------------------------------------------- card transactions */
+
+export type CardTransaction = {
+  id: string;
+  card: string;
+  date: string;
+  description: string;
+  merchant: string | null;
+  amount: number;
+  category_name: string | null;
+};
+
+/**
+ * Card line items are reference data, never expenses — expenses are cash out of
+ * the bank. This exists so a card payment can be drilled into.
+ *
+ * Returns `tableMissing` rather than throwing when the migration is pending, so
+ * the page degrades to a banner instead of a 500 (same rule as /wealth).
+ */
+export async function loadCardTransactions(opts: {
+  card?: string | null;
+  month?: string | null;
+  q?: string | null;
+}): Promise<{ rows: CardTransaction[]; tableMissing: boolean }> {
+  let query = supabaseAdmin
+    .from("eph_card_transactions")
+    .select("id,card,date,description,merchant,amount,category:eph_categories(name)")
+    .order("date", { ascending: false });
+  if (opts.card) query = query.eq("card", opts.card);
+  if (opts.month) {
+    // Month bucket, inclusive: first day of the month to first day of the next.
+    const [y, m] = opts.month.split("-").map(Number);
+    const start = `${opts.month}-01`;
+    const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+    query = query.gte("date", start).lt("date", end);
+  }
+  if (opts.q) {
+    const safe = opts.q.replace(/[%,()]/g, " ").trim();
+    if (safe) query = query.or(`description.ilike.*${safe}*,merchant.ilike.*${safe}*`);
+  }
+  const { data, error } = await query;
+  if (error) {
+    if (error.code === "42P01" || error.code === "PGRST205") return { rows: [], tableMissing: true };
+    throw error;
+  }
+  return {
+    rows: (data ?? []).map((r: Record<string, unknown>) => ({
+      id: String(r.id),
+      card: String(r.card),
+      date: String(r.date),
+      description: String(r.description ?? ""),
+      merchant: (r.merchant as string | null) ?? null,
+      amount: num(r.amount),
+      category_name: relName(r.category),
+    })),
+    tableMissing: false,
+  };
+}
+
+/** Distinct cards present, for the filter row. */
+export async function loadCardNames(): Promise<string[]> {
+  const { data, error } = await supabaseAdmin.from("eph_card_transactions").select("card");
+  if (error) return [];
+  return [...new Set((data ?? []).map((r) => String((r as { card: string }).card)))].sort();
+}
+
+/**
+ * The statement month a card payment covers. Payments settle the previous
+ * month's charges, which is the same assumption the expense importer uses for
+ * its category proportions — keep the two in step.
+ */
+export function statementMonthForPayment(paymentDate: string): string {
+  const [y, m] = paymentDate.slice(0, 7).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+}
+
 /* ------------------------------------------------------- dashboard range */
 
 export const DASHBOARD_RANGES = [

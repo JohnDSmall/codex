@@ -16,7 +16,7 @@ Recent structural changes: company-logo resolution is now database-driven
 | `web/` | Next.js 16.2.6 / React 19.2.4 | Supabase (remote) | ✅ working — `.env.local` is populated |
 | `ephemeris/` | Flask 3.0.3 | SQLite (local file) | ✅ working — **legacy fallback**, still owns the CSV importers |
 | `contacts/` | Python loaders | writes to Supabase | ⚠️ needs env vars, not yet run |
-| `supabase/` | 9 SQL migrations | — | schema definition only, all applied |
+| `supabase/` | 10 SQL migrations | — | schema definition only, all applied |
 
 ### Live figures (2026-08-08)
 
@@ -36,7 +36,7 @@ All figures are **Supabase**, which is the live data. The SQLite counts under
 
 ## ⚠️ START HERE — state as of 2026-08-08
 
-**One action is outstanding:** rotate the Supabase key. The push is done, and all nine migrations
+**One action is outstanding:** rotate the Supabase key. The push is done, and all ten migrations
 are now applied.
 
 ### 1. Push to GitHub — ✅ DONE
@@ -424,6 +424,40 @@ sum precisely to the card payments seen in the bank.
 `eph_expenses` now holds **652 rows, $265,276.45** — the 491 imported plus the 161 legacy
 spreadsheet rows. Everything is tagged `Personal`; 22 rows ($12,237.75) are uncategorized, all of
 them card payments from before the card statements begin.
+
+### Card detail — drilling into a payment
+
+Added 2026-08-08. `eph_card_transactions` holds every card line item as **reference data**. It is a
+separate table on purpose: expenses are cash out of the bank, these are what the card was used for,
+and keeping them apart means **no query can double-count them**, however it is written.
+
+```powershell
+node import_card_transactions.js --amex <dir> --card <dir> [--apply]
+```
+
+Idempotent on `dedupe_key` = `card|date|amount|description|occurrence`. The occurrence index is what
+lets two identical $3.00 subway fares on one day both survive while a re-exported statement adds
+nothing.
+
+**Loaded 2026-08-08: 1,661 charges, $112,714.46** — Amex 879 (2024-12-27 → 2026-07-18), BofA 782
+(2025-07-29 → 2026-08-07). Every row has a merchant; 1,376 (83%) have a category, from the same
+`CATEGORY_RULES`.
+
+**UI:** a *Card detail* tab at `/ephemeris/cards`, filterable by card, month and merchant search, with
+a Top Merchants roll-up. On `/ephemeris/expenses` the **Card column is a link** — a March payment
+opens that card's February charges, via `statementMonthForPayment()`. That function encodes the
+"a payment settles the previous month" assumption, the same one the expense importer uses for its
+category proportions; **change one and you must change the other.**
+
+The page degrades to a banner if the table is missing, and states on every view that these rows are
+never counted in a total. The Amex view adds that some charges are the partner's.
+
+**A payment before its statements exist drills into nothing** — every BofA payment before 2025-07 and
+all Chase payments show 0 charges. That is the coverage gap, not a fault.
+
+Card merchant names are messier than bank ones: Amex truncates differently between exports, so
+`THE CLIFT ROYAL SONEST SAN FRANCISCOCA` and `THE CLIFT ROYAL SONESAN FRANCISCO` are one hotel in two
+buckets. Left as-is rather than guessed; the full memo is on hover.
 
 ### Merchant names
 
@@ -1012,7 +1046,7 @@ that regression happened once during this session and this is the fix.
 
 ## supabase — schema
 
-Nine migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Ten migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -1027,6 +1061,7 @@ Nine migrations in `supabase/migrations/`. There is no local Supabase stack and 
 | `20260725160000_wealth_snapshots.sql` | ✅ applied 2026-07-25 |
 | `20260802120000_project_links.sql` | ✅ applied 2026-08-02 — DDL via SQL editor, backfill via REST |
 | `20260808120000_income_type_company.sql` | ✅ applied 2026-08-08 |
+| `20260808140000_card_transactions.sql` | ✅ applied 2026-08-08 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
@@ -1119,7 +1154,7 @@ codex/
 │   └── .env.local      gitignored — YOU MUST CREATE THIS
 ├── PRD-orrery.md       orrery PRD draft (committed 2026-08-02)
 ├── contacts/           one-off Python loaders → Supabase
-├── supabase/migrations/  9 SQL migrations
+├── supabase/migrations/  10 SQL migrations
 └── ephemeris/
     │   ── Node importers → SUPABASE (current) ──
     ├── import_bofa_income.js       income, clean window

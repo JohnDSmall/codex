@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { addExpense, deleteExpense } from "@/lib/ephemeris-actions";
 import {
   filtersFromSearchParams,
@@ -5,6 +6,7 @@ import {
   loadCategories,
   loadExpenses,
   loadTags,
+  statementMonthForPayment,
   type RawSearchParams,
 } from "@/lib/ephemeris-server";
 import { Filters, RangeLabel } from "../../components/ephemeris/Filters";
@@ -133,7 +135,21 @@ export default async function ExpensesPage({
                     <Td muted>{r.cat_name ?? "Uncategorized"}</Td>
                     <Td><TagPill name={r.tag_name} /></Td>
                     <Td muted>{r.client ?? ""}</Td>
-                    <Td muted>{r.card ?? "manual"}</Td>
+                    <Td muted>
+                      {r.card ? (
+                        // Card payments settle the previous month's charges;
+                        // drill into them rather than showing an opaque total.
+                        <Link
+                          href={`/ephemeris/cards?card=${encodeURIComponent(r.card)}&month=${statementMonthForPayment(r.date)}`}
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                          title={`See ${r.card} charges for ${statementMonthForPayment(r.date)}`}
+                        >
+                          {r.card}
+                        </Link>
+                      ) : (
+                        "manual"
+                      )}
+                    </Td>
                     <Td right className="font-medium">{fmtMoneyExact(r.amount)}</Td>
                     <Td right>
                       <DeleteButton

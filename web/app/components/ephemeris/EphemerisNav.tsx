@@ -8,6 +8,8 @@ const TABS = [
   { href: "/ephemeris/spending", label: "Spending" },
   { href: "/ephemeris/subscriptions", label: "Subscriptions" },
   { href: "/ephemeris/expenses", label: "Expenses" },
+  // Card charges are reference data, not expenses — see /ephemeris/cards.
+  { href: "/ephemeris/cards", label: "Card detail" },
   { href: "/ephemeris/income", label: "Income" },
   { href: "/ephemeris/assets", label: "Assets" },
   { href: "/ephemeris/hours", label: "Hours" },
