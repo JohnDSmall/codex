@@ -159,8 +159,10 @@ export default async function RelationshipDetailPage({
 
           {(contact.connection_source ||
             contact.looking_for ||
+            contact.competency !== null ||
             contact.connection_tags.length > 0 ||
             contact.interest_tags.length > 0 ||
+            contact.skill_tags.length > 0 ||
             contact.university_tags.length > 0) && (
             <Card title="Profile" icon={<Tag className="w-4 h-4" />}>
               <div className="space-y-3 text-sm">
@@ -182,8 +184,26 @@ export default async function RelationshipDetailPage({
                 {contact.interest_tags.length > 0 && (
                   <TagRow label="Interests" items={contact.interest_tags} />
                 )}
+                {contact.skill_tags.length > 0 && (
+                  <TagRow label="Skills" items={contact.skill_tags} />
+                )}
                 {contact.university_tags.length > 0 && (
                   <TagRow label="Universities" items={contact.university_tags} />
+                )}
+                {contact.competency !== null && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-neutral-500 mb-1">Competency</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold tabular-nums">{contact.competency}</span>
+                      <span className="text-neutral-400">/ 10</span>
+                      <span className="h-1.5 w-24 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                        <span
+                          className="block h-full bg-indigo-500"
+                          style={{ width: `${contact.competency * 10}%` }}
+                        />
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
             </Card>

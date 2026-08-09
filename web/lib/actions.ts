@@ -26,6 +26,8 @@ export type EditableContactInput = {
   company_tags?: string[];
   connection_tags?: string[];
   interest_tags?: string[];
+  skill_tags?: string[];
+  competency?: number | null;
   university_tags?: string[];
   reminders?: string[];
   timeline_notes?: { date: string; content: string }[];
@@ -53,10 +55,42 @@ const EDITABLE_KEYS: (keyof EditableContactInput)[] = [
   "company_tags",
   "connection_tags",
   "interest_tags",
+  "skill_tags",
+  "competency",
   "university_tags",
   "reminders",
   "timeline_notes",
 ];
+
+/** Drop exact repeats, preserving order and keeping the first occurrence. */
+function dedupe<T>(list: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of list) {
+    const k = typeof item === "string" ? item : JSON.stringify(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
+/**
+ * Repeated `timeline_notes` entries reached the database through the legacy
+ * relationship merge, whose source JSON contained the same note more than once
+ * — one contact showed the same entry four times. Nothing appends here (writes
+ * replace the whole array), so de-duplicating on the way in is enough to stop
+ * it recurring from any path that goes through these actions.
+ */
+const DEDUPED_LIST_KEYS = [
+  "timeline_notes",
+  "reminders",
+  "company_tags",
+  "connection_tags",
+  "interest_tags",
+  "skill_tags",
+  "university_tags",
+] as const;
 
 function normalize(input: EditableContactInput): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -66,6 +100,8 @@ function normalize(input: EditableContactInput): Record<string, unknown> {
       // Treat empty strings as null for nullable text columns
       if (typeof v === "string" && v.trim() === "") {
         out[k] = null;
+      } else if (Array.isArray(v) && (DEDUPED_LIST_KEYS as readonly string[]).includes(k)) {
+        out[k] = dedupe(v as unknown[]);
       } else {
         out[k] = v;
       }

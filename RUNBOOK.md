@@ -16,7 +16,7 @@ Recent structural changes: company-logo resolution is now database-driven
 | `web/` | Next.js 16.2.6 / React 19.2.4 | Supabase (remote) | ✅ working — `.env.local` is populated |
 | `ephemeris/` | Flask 3.0.3 | SQLite (local file) | ✅ working — **legacy fallback**, still owns the CSV importers |
 | `contacts/` | Python loaders | writes to Supabase | ⚠️ needs env vars, not yet run |
-| `supabase/` | 10 SQL migrations | — | schema definition only, all applied |
+| `supabase/` | 11 SQL migrations | — | schema definition only, all applied |
 
 ### Live figures (2026-08-08)
 
@@ -25,7 +25,7 @@ All figures are **Supabase**, which is the live data. The SQLite counts under
 
 | | |
 |---|---|
-| Contacts | ~1,186 |
+| Contacts | ~1,197 |
 | Companies | 180, of which **122** resolve a logo |
 | Projects | 14 · 65.5 h logged · $133,046 revenue linked |
 | Income | **145 rows, $348,847.18** · 2022-04-04 → 2026-07-31 |
@@ -36,7 +36,7 @@ All figures are **Supabase**, which is the live data. The SQLite counts under
 
 ## ⚠️ START HERE — state as of 2026-08-08
 
-**One action is outstanding:** rotate the Supabase key. The push is done, and all ten migrations
+**One action is outstanding:** rotate the Supabase key. The push is done, and all eleven migrations
 are now applied.
 
 ### 1. Push to GitHub — ✅ DONE
@@ -750,6 +750,64 @@ $16,150 = $149,196 total — both reconcile against the raw tables, with no orph
 
 ---
 
+## relationships — skills, competency, and the timeline duplicate bug
+
+### Skill tags and competency
+
+Added 2026-08-08 (`20260808160000_skill_tags_competency.sql`).
+
+| Column | Shape |
+|---|---|
+| `contacts.skill_tags` | `text[] not null default '{}'` — same as `company_tags` / `interest_tags` |
+| `contacts.competency` | `smallint`, CHECK 1–10, **nullable** |
+
+**Competency is nullable on purpose: unrated is not the same as rated-low.** The whole book starts
+unrated, and the form's default option is "Unrated" rather than a number. Wired through
+`lib/types.ts`, `contacts-server.ts` (`CONTACT_COLUMNS`), `actions.ts` (`EditableContactInput` +
+`EDITABLE_KEYS`), the edit form, and the detail page. **Adding another contact field means touching
+all five** — miss `CONTACT_COLUMNS` and the value silently never loads.
+
+### The timeline duplicate bug
+
+`/relationships/<id>` showed the same note repeated — one contact had **8 entries but 3 distinct**,
+one of them 4×. This was real data, not a rendering fault.
+
+Origin: the legacy relationship merge. `contacts/merge_old_relationships.py` builds `timeline_notes`
+from the source JSON and PATCHes the whole array — it does not append — so the repeats were in the
+source. Nothing in the app appends either.
+
+Scope was small and is now fixed: **5 contacts, 10 duplicate entries removed** (Tom Walshe, Jessie
+Li, Aaron Crawfis, Akilesh Praveen, Kyle Guzik).
+
+The guard is in code, not prose: `normalize()` in `lib/actions.ts` drops exact repeats from
+`timeline_notes`, `reminders`, and every tag array on every write, so no path through the Server
+Actions can reintroduce them.
+
+### Importing relationships from a CSV
+
+```powershell
+cd contacts
+node import_relationships_csv.js "<file.csv>" [--apply]
+```
+
+Columns: `Name, LinkedIn, strength, Skill, Notes, Rating, Companies`.
+
+- **Matches existing contacts on normalized full name and updates them** rather than inserting a
+  duplicate. With ~1,190 people in the book, a name-blind insert would quietly fork records.
+- On an update it **only fills blanks and merges tag arrays** — it never blanks a field the sheet
+  does not carry.
+- `strength` High/Medium/Low → `strong`/`medium`/`weak`. `Rating: No Data` → null.
+- **Company names are canonicalized on the way in** (`Handshake` → `Handshake AI`), so a sheet cannot
+  reintroduce a spelling that was standardized away.
+- Pages the contacts query — a single select stops at 1000 and would make everyone past that look new.
+
+Run 2026-08-08: 14 rows → **11 inserted, 3 merged** into existing contacts. Contacts 1,186 → 1,197.
+
+> The book contains ~10 pre-existing duplicate names (`dad`, `freddy`, `jon beroza`, …). They predate
+> this importer and are unrelated to it.
+
+---
+
 ## Company logos
 
 Reworked 2026-08-02. **`companies.logo_path` in Supabase is the source of truth** for which image a
@@ -1046,7 +1104,7 @@ that regression happened once during this session and this is the fix.
 
 ## supabase — schema
 
-Ten migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Eleven migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -1062,6 +1120,7 @@ Ten migrations in `supabase/migrations/`. There is no local Supabase stack and n
 | `20260802120000_project_links.sql` | ✅ applied 2026-08-02 — DDL via SQL editor, backfill via REST |
 | `20260808120000_income_type_company.sql` | ✅ applied 2026-08-08 |
 | `20260808140000_card_transactions.sql` | ✅ applied 2026-08-08 |
+| `20260808160000_skill_tags_competency.sql` | ✅ applied 2026-08-08 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
@@ -1154,7 +1213,7 @@ codex/
 │   └── .env.local      gitignored — YOU MUST CREATE THIS
 ├── PRD-orrery.md       orrery PRD draft (committed 2026-08-02)
 ├── contacts/           one-off Python loaders → Supabase
-├── supabase/migrations/  10 SQL migrations
+├── supabase/migrations/  11 SQL migrations
 └── ephemeris/
     │   ── Node importers → SUPABASE (current) ──
     ├── import_bofa_income.js       income, clean window

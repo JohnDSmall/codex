@@ -56,6 +56,8 @@ type FormState = Required<{
   company_tags: string[];
   connection_tags: string[];
   interest_tags: string[];
+  skill_tags: string[];
+  competency: "" | number;
   university_tags: string[];
   reminders: string[];
   timeline_notes: TimelineNote[];
@@ -81,6 +83,8 @@ function initialState(c?: Contact | null): FormState {
     company_tags: c?.company_tags ?? [],
     connection_tags: c?.connection_tags ?? [],
     interest_tags: c?.interest_tags ?? [],
+    skill_tags: c?.skill_tags ?? [],
+    competency: c?.competency ?? "",
     university_tags: c?.university_tags ?? [],
     reminders: c?.reminders ?? [],
     timeline_notes: c?.timeline_notes ?? [],
@@ -107,6 +111,8 @@ function toInput(s: FormState): EditableContactInput {
     company_tags: s.company_tags,
     connection_tags: s.connection_tags,
     interest_tags: s.interest_tags,
+    skill_tags: s.skill_tags,
+    competency: s.competency === "" ? null : Number(s.competency),
     university_tags: s.university_tags,
     reminders: s.reminders.filter((r) => r.trim() !== ""),
     timeline_notes: s.timeline_notes.filter((n) => n.content.trim() !== ""),
@@ -193,6 +199,19 @@ export function RelationshipForm({
             {PRIORITIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
+        <Field label="Competency (1–10)">
+          {/* Blank is meaningful: unrated is not the same as low. */}
+          <select
+            value={state.competency === "" ? "" : String(state.competency)}
+            onChange={(e) => set("competency", e.target.value === "" ? "" : Number(e.target.value))}
+            className={inputClass}
+          >
+            <option value="">Unrated</option>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Tracked">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={state.tracked} onChange={(e) => set("tracked", e.target.checked)} className="rounded" />
@@ -247,6 +266,13 @@ export function RelationshipForm({
             values={state.interest_tags}
             onChange={(v) => set("interest_tags", v)}
             placeholder="e.g. AI, Endurance Sports…"
+          />
+        </Field>
+        <Field label="Skills" fullWidth>
+          <ChipInput
+            values={state.skill_tags}
+            onChange={(v) => set("skill_tags", v)}
+            placeholder="e.g. Data Annotation, Sales…"
           />
         </Field>
         <Field label="Universities" fullWidth>

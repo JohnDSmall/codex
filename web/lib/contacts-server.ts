@@ -41,6 +41,8 @@ const CONTACT_COLUMNS = [
   "company_tags",
   "connection_tags",
   "interest_tags",
+  "skill_tags",
+  "competency",
   "university_tags",
   "connection_source",
   "looking_for",

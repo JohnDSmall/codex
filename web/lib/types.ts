@@ -60,6 +60,8 @@ export type Contact = {
   company_tags: string[];
   connection_tags: string[];
   interest_tags: string[];
+  skill_tags: string[];
+  competency: number | null;
   university_tags: string[];
   connection_source: string | null;
   looking_for: string | null;
