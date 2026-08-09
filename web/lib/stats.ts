@@ -1,12 +1,21 @@
-import type { Contact } from "./types";
+import type { Contact, StrengthTier } from "./types";
 
 export type OrgCount = { name: string; count: number };
 export type AreaCodeCount = { code: string; count: number };
 
+/**
+ * Where the network actually works, counting each person once.
+ *
+ * `organization` alone is the wrong field: it is the free-text iCloud import,
+ * set on ~134 of 1,193 contacts and full of memo text ("Personal", "Lax",
+ * "Michigan Head Coach"). `primary_company` is the curated field and is set on
+ * ~339. Reading only `organization` made the chart report Snorkel at 4 as the
+ * top employer while primary_company had Deloitte at 60.
+ */
 export function topOrganizations(contacts: Contact[], limit = 12): OrgCount[] {
   const counts = new Map<string, number>();
   for (const c of contacts) {
-    const org = c.organization?.trim();
+    const org = c.primary_company?.trim() || c.organization?.trim();
     if (!org) continue;
     counts.set(org, (counts.get(org) ?? 0) + 1);
   }
@@ -14,6 +23,62 @@ export function topOrganizations(contacts: Contact[], limit = 12): OrgCount[] {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+export type CompetencyBucket = { label: string; count: number };
+export type StrengthBucket = { tier: StrengthTier | "unrated"; label: string; count: number };
+
+/**
+ * Competency 1-10, plus an explicit Unrated bucket. Unrated is not zero and
+ * must stay visually separate, or an unfilled book reads as a book of
+ * incompetents.
+ */
+export function competencyDistribution(contacts: Contact[]): {
+  buckets: CompetencyBucket[];
+  rated: number;
+  unrated: number;
+  average: number | null;
+} {
+  const counts = new Map<number, number>();
+  let rated = 0;
+  let sum = 0;
+  for (const c of contacts) {
+    if (c.competency == null) continue;
+    rated++;
+    sum += c.competency;
+    counts.set(c.competency, (counts.get(c.competency) ?? 0) + 1);
+  }
+  const buckets: CompetencyBucket[] = Array.from({ length: 10 }, (_, i) => ({
+    label: String(i + 1),
+    count: counts.get(i + 1) ?? 0,
+  }));
+  return {
+    buckets,
+    rated,
+    unrated: contacts.length - rated,
+    average: rated ? sum / rated : null,
+  };
+}
+
+const STRENGTH_ORDER: { tier: StrengthTier; label: string }[] = [
+  { tier: "strong", label: "Strong" },
+  { tier: "medium", label: "Medium" },
+  { tier: "weak", label: "Weak" },
+  { tier: "loose", label: "Loose" },
+  { tier: "none", label: "None" },
+];
+
+export function strengthDistribution(contacts: Contact[]): StrengthBucket[] {
+  const counts = new Map<string, number>();
+  for (const c of contacts) {
+    const t = c.strength_tier ?? "none";
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  return STRENGTH_ORDER.map(({ tier, label }) => ({
+    tier,
+    label,
+    count: counts.get(tier) ?? 0,
+  }));
 }
 
 function extractAreaCode(phone: string): string | null {

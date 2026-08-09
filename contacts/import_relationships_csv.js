@@ -157,7 +157,12 @@ function rating(v) {
       strength_tier: p.strength_tier ?? "none",
       skill_tags: p.skill_tags,
       company_tags: p.company_tags,
-      primary_company: p.company_tags[0] ?? null,
+      // The sheet lists companies oldest-first, so [0] is a FORMER employer —
+      // taking it made Alex Chiou "Instagram" when he is at Handshake. Prefer
+      // the current employer when it is present, else the last listed.
+      primary_company: p.company_tags.includes("Handshake AI")
+        ? "Handshake AI"
+        : p.company_tags[p.company_tags.length - 1] ?? null,
       competency: p.competency,
       notes: p.notes,
       tracked: true,

@@ -2,10 +2,17 @@
 
 import { useState } from "react";
 import type { Contact } from "@/lib/types";
-import type { AreaCodeCount, OrgCount, Summary } from "@/lib/stats";
+import type {
+  AreaCodeCount,
+  CompetencyBucket,
+  OrgCount,
+  StrengthBucket,
+  Summary,
+} from "@/lib/stats";
 import { StatsCards } from "./StatsCards";
 import { TopOrgsChart } from "./TopOrgsChart";
 import { AreaCodeChart } from "./AreaCodeChart";
+import { CompetencyCard, StrengthCard } from "./DistributionCards";
 import { ContactsTable } from "./ContactsTable";
 import { ContactDetail } from "./ContactDetail";
 
@@ -14,11 +21,20 @@ export function Dashboard({
   summary,
   topOrgs,
   topAreaCodes,
+  competency,
+  strength,
 }: {
   contacts: Contact[];
   summary: Summary;
   topOrgs: OrgCount[];
   topAreaCodes: AreaCodeCount[];
+  competency: {
+    buckets: CompetencyBucket[];
+    rated: number;
+    unrated: number;
+    average: number | null;
+  };
+  strength: StrengthBucket[];
 }) {
   const [selected, setSelected] = useState<Contact | null>(null);
 
@@ -32,6 +48,16 @@ export function Dashboard({
       </header>
 
       <StatsCards s={summary} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CompetencyCard
+          buckets={competency.buckets}
+          rated={competency.rated}
+          unrated={competency.unrated}
+          average={competency.average}
+        />
+        <StrengthCard buckets={strength} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel title="Top organizations">

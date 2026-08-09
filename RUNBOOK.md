@@ -783,6 +783,35 @@ The guard is in code, not prose: `normalize()` in `lib/actions.ts` drops exact r
 `timeline_notes`, `reminders`, and every tag array on every write, so no path through the Server
 Actions can reintroduce them.
 
+### Network dashboard — which company field to count
+
+`/relationships/dashboard` has three overlapping company fields and they are **not**
+interchangeable:
+
+| Field | Set on | What it is |
+|---|---:|---|
+| `organization` | 134 | free-text iCloud import — memo noise (`Personal`, `Lax`, `Michigan Head Coach`) |
+| `primary_company` | 339 | curated current employer — **use this** |
+| `company_tags` | 75 | every company a person is associated with, past and present |
+
+`topOrganizations()` read **only `organization`**, so the chart reported *Snorkel, 4* as the top
+employer while `primary_company` held *Deloitte, 60*. It now reads
+`primary_company || organization`, counting each person once.
+
+Counting `company_tags` instead would list a person under every employer they have ever had — useful
+for "who could introduce me to X", wrong for "where does my network work". Left as a possible second
+chart rather than folded into this one.
+
+### Competency and connection-strength summaries
+
+Two server-rendered distribution cards on the dashboard (`DistributionCards.tsx`), plain bars rather
+than a chart library since these are small ordered distributions where the number matters more than
+the shape.
+
+**Unrated sits outside the 1–10 bars, and "None" is labelled as untiered rather than weak.** Folding
+either into the distribution would make an unfilled book read as a book of incompetent strangers —
+the same missing-vs-low trap as [competency](#skill-tags-and-competency) itself.
+
 ### Importing relationships from a CSV
 
 ```powershell
@@ -802,6 +831,12 @@ Columns: `Name, LinkedIn, strength, Skill, Notes, Rating, Companies`.
 - Pages the contacts query — a single select stops at 1000 and would make everyone past that look new.
 
 Run 2026-08-08: 14 rows → **11 inserted, 3 merged** into existing contacts. Contacts 1,186 → 1,197.
+
+**`primary_company` needs care: the sheet lists companies oldest-first.** The first version took
+`company_tags[0]` and so recorded a *former* employer for 8 of 11 people — Alex Chiou became
+"Instagram" when he is at Handshake. Corrected in the data and in the importer, which now prefers
+`Handshake AI` where present and otherwise takes the last listed. If a future sheet uses a different
+ordering, check this before importing.
 
 > The book contains ~10 pre-existing duplicate names (`dad`, `freddy`, `jon beroza`, …). They predate
 > this importer and are unrelated to it.

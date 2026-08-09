@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { loadAllContacts } from "@/lib/contacts-server";
-import { summarize, topAreaCodes, topOrganizations } from "@/lib/stats";
+import {
+  competencyDistribution,
+  strengthDistribution,
+  summarize,
+  topAreaCodes,
+  topOrganizations,
+} from "@/lib/stats";
 import { Dashboard } from "../../components/Dashboard";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +16,8 @@ export default async function NetworkDashboardPage() {
   const summary = summarize(contacts);
   const orgs = topOrganizations(contacts);
   const codes = topAreaCodes(contacts);
+  const competency = competencyDistribution(contacts);
+  const strength = strengthDistribution(contacts);
   return (
     <div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
@@ -25,6 +33,8 @@ export default async function NetworkDashboardPage() {
         summary={summary}
         topOrgs={orgs}
         topAreaCodes={codes}
+        competency={competency}
+        strength={strength}
       />
     </div>
   );
