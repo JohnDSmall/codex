@@ -4,20 +4,27 @@ export type OrgCount = { name: string; count: number };
 export type AreaCodeCount = { code: string; count: number };
 
 /**
- * Where the network actually works, counting each person once.
+ * Companies by how many people are TAGGED with them — `company_tags`, not
+ * `primary_company`. Someone who worked at Scale and is now at Handshake AI
+ * counts under both, which is the point: the question is "who do I know
+ * connected to X", not "who is employed by X today".
  *
- * `organization` alone is the wrong field: it is the free-text iCloud import,
- * set on ~134 of 1,193 contacts and full of memo text ("Personal", "Lax",
- * "Michigan Head Coach"). `primary_company` is the curated field and is set on
- * ~339. Reading only `organization` made the chart report Snorkel at 4 as the
- * top employer while primary_company had Deloitte at 60.
+ * A person therefore contributes to several rows, so these counts do not sum to
+ * the contact total.
+ *
+ * `organization` is deliberately unused: it is the free-text iCloud import, set
+ * on ~134 of 1,193 contacts and full of memo text ("Personal", "Lax", "Michigan
+ * Head Coach"). Reading it made the chart report Snorkel at 4 as the top
+ * employer.
  */
 export function topOrganizations(contacts: Contact[], limit = 12): OrgCount[] {
   const counts = new Map<string, number>();
   for (const c of contacts) {
-    const org = c.primary_company?.trim() || c.organization?.trim();
-    if (!org) continue;
-    counts.set(org, (counts.get(org) ?? 0) + 1);
+    for (const raw of c.company_tags ?? []) {
+      const tag = raw?.trim();
+      if (!tag) continue;
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
   }
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))

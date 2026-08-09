@@ -794,13 +794,18 @@ interchangeable:
 | `primary_company` | 339 | curated current employer — **use this** |
 | `company_tags` | 75 | every company a person is associated with, past and present |
 
-`topOrganizations()` read **only `organization`**, so the chart reported *Snorkel, 4* as the top
-employer while `primary_company` held *Deloitte, 60*. It now reads
-`primary_company || organization`, counting each person once.
+`topOrganizations()` originally read **only `organization`**, so the chart reported *Snorkel, 4* as
+the top employer while `primary_company` held *Deloitte, 60*.
 
-Counting `company_tags` instead would list a person under every employer they have ever had — useful
-for "who could introduce me to X", wrong for "where does my network work". Left as a possible second
-chart rather than folded into this one.
+**It now counts `company_tags`** (decided 2026-08-09). The question being asked is "who do I know
+connected to X", not "who works there today", so someone who was at Scale and is now at Handshake AI
+counts under both. **A person therefore appears in several rows and the counts do not sum to the
+contact total.**
+
+**The cost is coverage: only 75 of 1,193 contacts carry any `company_tags`.** 273 contacts have a
+`primary_company` but no tags and so appear nowhere on the chart — including 55 Deloitte people, which
+is why Deloitte reads 9 rather than 64. Backfilling `company_tags` from `primary_company` would close
+that gap and is the obvious next step if the chart looks thin.
 
 ### Competency and connection-strength summaries
 
@@ -926,6 +931,18 @@ Done 2026-08-08:
 |---|---|
 | `Oppenheimer & Co Inc` → `Oppenheimer` | 1 `companies` row (PK), 1 contact |
 | `Handshake` → `Handshake AI` | 4 contacts (1 `primary_company`, 3 `company_tags`) |
+
+**Sweeping a rename across everything.** `Handshake` → `Handshake AI` was re-swept on 2026-08-09
+across every company-bearing column in `contacts`, `companies`, `projects`, `eph_income`,
+`eph_expenses`, `eph_hours`, `eph_tags` and `eph_card_transactions`: **0 structured fields still said
+plain "Handshake"** — the earlier pass plus the importer's canonicalization had covered them. Five
+`contacts.connection_source` values ("Worked together at Handshake") were prose about the
+relationship rather than source records, so those were updated too.
+
+**`eph_income.notes` was deliberately left alone.** It holds the verbatim bank memo
+(`Imported from checking_stmt.csv: Handshake DES:CTP2JUUY3N…`) for ~40 rows. That text is the audit
+trail — the statement really does say "Handshake" — and rewriting it would make a row untraceable to
+its source line. **Rename company fields; never rewrite a captured source string.**
 
 **Scan for name usage with a paged query.** PostgREST caps a response at 1000 rows and there are
 ~1,186 contacts, so an unpaged `select` silently misses the tail — that mistake initially reported
