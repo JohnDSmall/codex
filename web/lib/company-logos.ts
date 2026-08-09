@@ -53,7 +53,7 @@ const NAME_ALIASES: Record<string, string> = {
   groupharm: "Group Harmonics",
   gs: "Goldman Sachs",
   iac: "IA Collaborative",
-  idea: "IDEA Center",
+  idea: "Idea Center",
   ieq: "IEQ Capital",
   invesity: "INVENSITY",
   "j.p. morgan": "JP Morgan",

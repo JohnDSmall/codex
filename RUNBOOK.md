@@ -802,10 +802,13 @@ connected to X", not "who works there today", so someone who was at Scale and is
 counts under both. **A person therefore appears in several rows and the counts do not sum to the
 contact total.**
 
-**The cost is coverage: only 75 of 1,193 contacts carry any `company_tags`.** 273 contacts have a
-`primary_company` but no tags and so appear nowhere on the chart — including 55 Deloitte people, which
-is why Deloitte reads 9 rather than 64. Backfilling `company_tags` from `primary_company` would close
-that gap and is the obvious next step if the chart looks thin.
+**`primary_company` is now mirrored into `company_tags`** (backfilled 2026-08-09, 310 contacts). Tags
+are therefore the complete affiliation field: all **339** contacts with a primary company carry it as
+a tag, and coverage went 75 → 348 tagged contacts. Deloitte reads 66 rather than 9.
+
+Keep that invariant when writing contacts: **if you set `primary_company`, add it to `company_tags`
+too**, or the person vanishes from this chart. The match is case-insensitive so `Deloitte` next to
+`deloitte` doesn't create a second bucket.
 
 ### Competency and connection-strength summaries
 
@@ -943,6 +946,13 @@ relationship rather than source records, so those were updated too.
 (`Imported from checking_stmt.csv: Handshake DES:CTP2JUUY3N…`) for ~40 rows. That text is the audit
 trail — the statement really does say "Handshake" — and rewriting it would make a row untraceable to
 its source line. **Rename company fields; never rewrite a captured source string.**
+
+`IDEA Center` → `Idea Center` on 2026-08-09 followed the same rule: the `companies` primary key,
+7 contacts' `primary_company`/`organization`, and 2 descriptive `connection_source` values were
+renamed; `contacts.raw_vcard` — the captured iCloud payload — was not. The PK rename was safe only
+because nothing referenced it (`eph_income.company_id` and `projects` both checked first), and
+`NAME_ALIASES` in `lib/company-logos.ts` had to move with it or the logo would have stopped
+resolving.
 
 **Scan for name usage with a paged query.** PostgREST caps a response at 1000 rows and there are
 ~1,186 contacts, so an unpaged `select` silently misses the tail — that mistake initially reported
