@@ -4,7 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { Link2, Link2Off } from "lucide-react";
 import type { IncomeEntry } from "@/lib/projects-server";
 import { addProjectIncome, linkIncome, unlinkIncome } from "@/lib/projects-actions";
-import { AddPanel, Field, SubmitButton, fieldCls } from "./ephemeris/RowActions";
+import { AddPanel } from "./ephemeris/RowActions";
+import { Field, SubmitButton, fieldCls } from "./ephemeris/ui";
 
 const money = (n: number) =>
   n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });

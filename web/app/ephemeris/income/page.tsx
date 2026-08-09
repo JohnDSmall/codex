@@ -9,7 +9,8 @@ import {
   type RawSearchParams,
 } from "@/lib/ephemeris-server";
 import { TagChips } from "../../components/ephemeris/TagChips";
-import { AddPanel, DeleteButton, Field, SubmitButton, fieldCls } from "../../components/ephemeris/RowActions";
+import { AddPanel, DeleteButton } from "../../components/ephemeris/RowActions";
+import { Field, SubmitButton, fieldCls } from "../../components/ephemeris/ui";
 import {
   Card,
   Empty,

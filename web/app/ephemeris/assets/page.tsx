@@ -1,6 +1,7 @@
 import { addAsset, deleteAsset } from "@/lib/ephemeris-actions";
 import { loadAssets, loadTags } from "@/lib/ephemeris-server";
-import { AddPanel, DeleteButton, Field, SubmitButton, fieldCls } from "../../components/ephemeris/RowActions";
+import { AddPanel, DeleteButton } from "../../components/ephemeris/RowActions";
+import { Field, SubmitButton, fieldCls } from "../../components/ephemeris/ui";
 import {
   Card,
   Empty,

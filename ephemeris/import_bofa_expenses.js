@@ -23,6 +23,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const { merchantFor } = require("./merchant_names");
 
 const argv = process.argv.slice(2);
 const APPLY = argv.includes("--apply");
@@ -255,7 +256,7 @@ function monthlyCategoryShares(charges) {
       out.push({
         date: r.date, amount: r.amount, category: cat,
         description: r.desc.slice(0, 120),
-        merchant: null, card: null, source: r.source_file, account: r.account,
+        merchant: merchantFor(r.desc), card: null, source: r.source_file, account: r.account,
         notes: `Bank debit from ${r.account} (${r.source_file})`,
       });
       continue;
@@ -268,7 +269,7 @@ function monthlyCategoryShares(charges) {
       out.push({
         date: r.date, amount: r.amount, category: null,
         description: `${cardName} card payment`,
-        merchant: null, card: cardName, source: r.source_file, account: r.account,
+        merchant: merchantFor(r.desc, cardName), card: cardName, source: r.source_file, account: r.account,
         notes: `Card payment from ${r.account}; no ${cardName} statement covers ${prevMonth(r.date.slice(0, 7))}, so it is uncategorized`,
       });
       continue;
@@ -289,7 +290,7 @@ function monthlyCategoryShares(charges) {
       out.push({
         date: r.date, amount: p.amount, category: p.cat,
         description: `${cardName} card payment — ${p.cat} share`,
-        merchant: null, card: cardName, source: r.source_file, account: r.account,
+        merchant: merchantFor(r.desc, cardName), card: cardName, source: r.source_file, account: r.account,
         notes: `Allocated ${(100 * p.amount / r.amount).toFixed(1)}% of a $${r.amount.toFixed(2)} ${cardName} payment, by ${prevMonth(r.date.slice(0, 7))} charge mix`,
       });
     }

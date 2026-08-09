@@ -8,7 +8,8 @@ import {
   type RawSearchParams,
 } from "@/lib/ephemeris-server";
 import { Filters, RangeLabel } from "../../components/ephemeris/Filters";
-import { AddPanel, DeleteButton, Field, SubmitButton, fieldCls } from "../../components/ephemeris/RowActions";
+import { AddPanel, DeleteButton } from "../../components/ephemeris/RowActions";
+import { Field, SubmitButton, fieldCls } from "../../components/ephemeris/ui";
 import {
   Card,
   Empty,

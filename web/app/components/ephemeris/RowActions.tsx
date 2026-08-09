@@ -102,33 +102,10 @@ export function AddPanel({
   );
 }
 
-export const fieldCls =
-  "rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-2.5 py-1.5 text-sm min-w-0";
-
-export function Field({
-  label,
-  children,
-  grow = false,
-}: {
-  label: string;
-  children: ReactNode;
-  grow?: boolean;
-}) {
-  return (
-    <label className={`flex flex-col gap-1 ${grow ? "flex-1 min-w-[10rem]" : ""}`}>
-      <span className="text-xs text-neutral-500">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-export function SubmitButton({ children }: { children: ReactNode }) {
-  return (
-    <button
-      type="submit"
-      className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 text-sm font-medium"
-    >
-      {children}
-    </button>
-  );
-}
+// fieldCls / Field / SubmitButton used to live here. This module is
+// "use client", and reading a non-component export of a client module from a
+// Server Component throws "Attempted to call fieldCls() from the server" — which
+// it did, on /ephemeris/expenses, /income, /hours and /assets. They are plain
+// presentational helpers with no hooks, so they now live in ./ui and must be
+// imported from there. Re-exporting them here would not help: the re-export is
+// still part of this client module's boundary.

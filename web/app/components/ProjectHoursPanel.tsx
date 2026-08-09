@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { Link2Off } from "lucide-react";
 import type { HourEntry } from "@/lib/projects-server";
 import { deleteHourEntry, logProjectHours, unlinkHourEntry } from "@/lib/projects-actions";
-import { AddPanel, DeleteButton, Field, SubmitButton, fieldCls } from "./ephemeris/RowActions";
+import { AddPanel, DeleteButton } from "./ephemeris/RowActions";
+import { Field, SubmitButton, fieldCls } from "./ephemeris/ui";
 
 function fmtDate(d: string): string {
   try {

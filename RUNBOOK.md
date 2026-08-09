@@ -425,6 +425,26 @@ sum precisely to the card payments seen in the bank.
 spreadsheet rows. Everything is tagged `Personal`; 22 rows ($12,237.75) are uncategorized, all of
 them card payments from before the card statements begin.
 
+### Merchant names
+
+`ephemeris/merchant_names.js` maps a raw memo to a readable, **batchable** merchant. It is shared by
+`import_bofa_expenses.js` and any backfill, so the two cannot drift.
+
+This matters because both `/ephemeris/expenses` and `/ephemeris/spending` render
+`merchant || description`, and *Top merchants* groups on that same expression. A bank memo carries a
+per-transaction id — `Two Lincoln Squa DES:WEB PMTS ID:V2XZ8K INDN:CameronCorse CO` — so **nine rent
+payments grouped as nine separate merchants** until `merchant` was set. Now they are one:
+`2 Lincoln Square`.
+
+Card-payment rows batch under the card (`American Express`, `BofA Credit Card`). The individual
+merchants behind them live on the card statement, which this model does not import as rows — so
+**`/ephemeris/spending` cannot show CVS-level detail for card spend**, only for rows paid directly
+from the bank and for the legacy spreadsheet rows.
+
+620 of 652 rows carry a merchant. The remaining 32 are one-off legacy rows (`TurboTax`,
+`Noun Project`, a few restaurants) whose descriptions already read well and which have nothing to
+batch with. Add a rule when a name starts repeating, not before.
+
 ### Coverage limits
 
 - **BofA card 7061 statements start 2025-07-28**, but the card was being paid from Feb 2025. Those
@@ -1179,6 +1199,14 @@ read back from the running app or straight from PostgREST. Every real bug this r
 6. **Overview period filter** (`?range=`, YTD default), net split into its own table, and two income
    KPIs (YTD, lagging 3-complete-month average).
 7. **Merged the `Handshake` and `HAI` tags** into `Handshake AI`, and updated `DEFAULT_TAGS`.
+8. **Fixed a client/server boundary crash.** `fieldCls` / `Field` / `SubmitButton` were exported from
+   `RowActions.tsx`, which is `"use client"`, and imported by four Server Components —
+   `/ephemeris/expenses`, `/income`, `/hours`, `/assets` all rendered
+   *"Attempted to call fieldCls() from the server"*. Moved them to `ui.tsx`, which has no
+   `"use client"`. **Re-exporting from the client module would not have fixed it** — a re-export is
+   still part of that module's boundary. Note the pages still returned **200**; the error only
+   appeared in the rendered output.
+9. **Readable merchant names** — see [merchant names](#merchant-names).
 8. **Refreshed this runbook**: route smoke test now covers all 21 routes including the dynamic ones,
    layout tree updated, live figures added at the top.
 

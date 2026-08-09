@@ -158,3 +158,39 @@ export function TagPill({ name }: { name: string | null }) {
     </span>
   );
 }
+
+/* ------------------------------------------------------------ form bits */
+// These live here rather than in RowActions.tsx because that module is
+// "use client" and these are read by Server Components. A non-component export
+// of a client module cannot be read on the server.
+
+export const fieldCls =
+  "rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-2.5 py-1.5 text-sm min-w-0";
+
+export function Field({
+  label,
+  children,
+  grow = false,
+}: {
+  label: string;
+  children: ReactNode;
+  grow?: boolean;
+}) {
+  return (
+    <label className={`flex flex-col gap-1 ${grow ? "flex-1 min-w-[10rem]" : ""}`}>
+      <span className="text-xs text-neutral-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+export function SubmitButton({ children }: { children: ReactNode }) {
+  return (
+    <button
+      type="submit"
+      className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 text-sm font-medium"
+    >
+      {children}
+    </button>
+  );
+}
