@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { Contact } from "@/lib/types";
 import type {
-  AreaCodeCount,
   CompetencyBucket,
   OrgCount,
   StrengthBucket,
@@ -11,7 +10,6 @@ import type {
 } from "@/lib/stats";
 import { StatsCards } from "./StatsCards";
 import { TopOrgsChart } from "./TopOrgsChart";
-import { AreaCodeChart } from "./AreaCodeChart";
 import { CompetencyCard, StrengthCard } from "./DistributionCards";
 import { ContactsTable } from "./ContactsTable";
 import { ContactDetail } from "./ContactDetail";
@@ -20,14 +18,12 @@ export function Dashboard({
   contacts,
   summary,
   topOrgs,
-  topAreaCodes,
   competency,
   strength,
 }: {
   contacts: Contact[];
   summary: Summary;
   topOrgs: OrgCount[];
-  topAreaCodes: AreaCodeCount[];
   competency: {
     buckets: CompetencyBucket[];
     rated: number;
@@ -59,14 +55,9 @@ export function Dashboard({
         <StrengthCard buckets={strength} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title="Top organizations">
-          <TopOrgsChart data={topOrgs} />
-        </Panel>
-        <Panel title="Top area codes">
-          <AreaCodeChart data={topAreaCodes} />
-        </Panel>
-      </div>
+      <Panel title="Top organizations">
+        <TopOrgsChart data={topOrgs} />
+      </Panel>
 
       <ContactsTable contacts={contacts} onSelect={setSelected} />
 

@@ -1,7 +1,6 @@
 import type { Contact, StrengthTier } from "./types";
 
 export type OrgCount = { name: string; count: number };
-export type AreaCodeCount = { code: string; count: number };
 
 /**
  * Companies by how many people are TAGGED with them — `company_tags`, not
@@ -86,29 +85,6 @@ export function strengthDistribution(contacts: Contact[]): StrengthBucket[] {
     label,
     count: counts.get(tier) ?? 0,
   }));
-}
-
-function extractAreaCode(phone: string): string | null {
-  // Strip non-digits, then look for a US-style 10-digit number.
-  const digits = phone.replace(/\D+/g, "");
-  if (digits.length === 11 && digits.startsWith("1")) return digits.slice(1, 4);
-  if (digits.length === 10) return digits.slice(0, 3);
-  return null;
-}
-
-export function topAreaCodes(contacts: Contact[], limit = 12): AreaCodeCount[] {
-  const counts = new Map<string, number>();
-  for (const c of contacts) {
-    for (const p of c.phones) {
-      const ac = extractAreaCode(p.value);
-      if (!ac) continue;
-      counts.set(ac, (counts.get(ac) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()]
-    .map(([code, count]) => ({ code, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
 }
 
 export type Summary = {

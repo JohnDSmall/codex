@@ -4,7 +4,6 @@ import {
   competencyDistribution,
   strengthDistribution,
   summarize,
-  topAreaCodes,
   topOrganizations,
 } from "@/lib/stats";
 import { Dashboard } from "../../components/Dashboard";
@@ -15,7 +14,6 @@ export default async function NetworkDashboardPage() {
   const contacts = await loadAllContacts();
   const summary = summarize(contacts);
   const orgs = topOrganizations(contacts);
-  const codes = topAreaCodes(contacts);
   const competency = competencyDistribution(contacts);
   const strength = strengthDistribution(contacts);
   return (
@@ -32,7 +30,6 @@ export default async function NetworkDashboardPage() {
         contacts={contacts}
         summary={summary}
         topOrgs={orgs}
-        topAreaCodes={codes}
         competency={competency}
         strength={strength}
       />
