@@ -1377,6 +1377,65 @@ never treated as proof; `/expenses` returns 200 with zero rows by default.
 
 ---
 
+## Future improvements
+
+Wanted but not built. Each entry records what is actually in the way, so the next session starts from
+evidence rather than re-deriving it.
+
+### Auto-update `last_contact_date` from Messages and email
+
+**The want (2026-08-08):** stop maintaining "when did I last speak to this person" by hand. Ingest
+Apple Messages and email, match each thread to a contact, and set `last_contact_date` from the most
+recent real exchange. The generic name for this is *communication-history ingestion* — the same thing
+Clay, Dex and Monica do.
+
+It would fix a field that is currently close to fiction: **316 contacts share the same
+`last_contact_date` of 2025-11-26**, a bulk stamp rather than an observation, and every downstream
+"days until contact" figure inherits it.
+
+**Three blockers, in the order they bite:**
+
+1. **Identifier coverage is the real problem, not the plumbing.** Matching needs a phone number or
+   email address, and (2026-08-08):
+
+   | | All contacts | Tracked (349) |
+   |---|---:|---:|
+   | Has a phone | 930 (77.8%) | **28.1%** |
+   | Has an email | 12 (1.0%) | **0.0%** |
+   | Has neither | 265 (22.2%) | **71.9%** |
+
+   **Nearly three quarters of the people actually tracked have no phone or email on file**, so an
+   ingestion built today would silently do nothing for them while looking like it worked. Email
+   matching is effectively unavailable at 12 addresses. Backfilling identifiers for the tracked set is
+   the prerequisite, and it is a data problem, not an engineering one.
+
+2. **Apple Messages is not readable on this machine.** iMessage history lives in
+   `~/Library/Messages/chat.db`, a SQLite file that exists **only on macOS**; this is a Windows box
+   (see [machine facts](#machine-facts-this-box)). Realistic routes: run the extractor on a Mac and
+   sync the result; or parse `sms.db` out of an unencrypted local iPhone backup made via iTunes on
+   Windows. Neither is a live feed — both are periodic snapshots, which is fine for a date field.
+
+3. **Email needs a source decision.** The account is Gmail
+   (`johnathan.d.small@gmail.com`), and there is an existing
+   [gmail management runbook](../Documents/email-management-runbook.md) plus MCP Gmail access in some
+   sessions. Gmail API by label/query is the obvious route; the open question is whether to ingest
+   metadata only (from/to/date — enough for `last_contact_date`) or bodies. **Metadata only** is the
+   smaller, safer build and answers the actual question.
+
+**Design notes for whoever builds it:**
+
+- Write to a new `contact_touches` table (contact_id, channel, direction, occurred_at, source_id),
+  not straight to `last_contact_date`. Keep `last_contact_date` a denormalized mirror of the newest
+  touch, exactly as `wealth_items.current_value` mirrors the newest snapshot. That preserves history
+  and makes re-imports idempotent.
+- **Distinguish "no data" from "no contact".** A contact with no identifier must not read as
+  "last spoken to: never" — that is the same unrated-vs-rated-low trap as
+  [competency](#skill-tags-and-competency).
+- Direction matters: a newsletter arriving is not contact. Filter to threads with at least one
+  outbound message, or the whole book will look freshly touched.
+
+---
+
 ## Adding a new app to codex
 
 Per the repo README, each subdirectory is self-contained with its own README and its own venv. The pattern (adjusted for this machine):
