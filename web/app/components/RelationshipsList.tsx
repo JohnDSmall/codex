@@ -9,7 +9,6 @@ import { RelationshipCard } from "./RelationshipCard";
 
 type StrengthFilter = "all" | StrengthTier;
 type FollowUpFilter = "all" | "scheduled" | "overdue" | "none";
-type TrackedFilter = "tracked" | "untracked" | "all";
 
 type SearchField =
   | "any"
@@ -112,23 +111,33 @@ export function RelationshipsList({
 }) {
   const [query, setQuery] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("name");
-  const [tracked, setTracked] = useState<TrackedFilter>("tracked");
+  const [trackedOnly, setTrackedOnly] = useState(true);
   const [strength, setStrength] = useState<StrengthFilter>("all");
   const [followUp, setFollowUp] = useState<FollowUpFilter>("all");
   const [shown, setShown] = useState(PAGE_SIZE);
 
   const filtered = useMemo(() => {
-    return contacts.filter((c) => {
-      if (!matchesSearch(c, query, searchField)) return false;
-      if (tracked === "tracked" && !c.tracked) return false;
-      if (tracked === "untracked" && c.tracked) return false;
-      if (strength !== "all" && c.strength_tier !== strength) return false;
-      if (followUp === "scheduled" && !c.target_contact_date) return false;
-      if (followUp === "overdue" && !isOverdue(c)) return false;
-      if (followUp === "none" && c.target_contact_date) return false;
-      return true;
-    });
-  }, [contacts, query, searchField, tracked, strength, followUp]);
+    return contacts
+      .filter((c) => {
+        if (!matchesSearch(c, query, searchField)) return false;
+        if (trackedOnly && !c.tracked) return false;
+        if (strength !== "all" && c.strength_tier !== strength) return false;
+        if (followUp === "scheduled" && !c.target_contact_date) return false;
+        if (followUp === "overdue" && !isOverdue(c)) return false;
+        if (followUp === "none" && c.target_contact_date) return false;
+        return true;
+      })
+      // Soonest next-contact first: most overdue at the top, furthest out at the
+      // bottom, then anyone with no date. ISO dates compare correctly as strings.
+      .sort((a, b) => {
+        const da = a.target_contact_date;
+        const db = b.target_contact_date;
+        if (da && db) return da.localeCompare(db) || displayName(a).localeCompare(displayName(b));
+        if (da) return -1;
+        if (db) return 1;
+        return displayName(a).localeCompare(displayName(b));
+      });
+  }, [contacts, query, searchField, trackedOnly, strength, followUp]);
 
   const visible = filtered.slice(0, shown);
 
@@ -169,15 +178,18 @@ export function RelationshipsList({
             className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm outline-none"
           />
         </div>
-        <Select
-          value={tracked}
-          onChange={(v) => setTracked(v as TrackedFilter)}
-          options={[
-            { value: "tracked", label: "Tracked only" },
-            { value: "untracked", label: "Untracked only" },
-            { value: "all", label: "All relationships" },
-          ]}
-        />
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={trackedOnly}
+            onChange={(e) => {
+              setTrackedOnly(e.target.checked);
+              setShown(PAGE_SIZE);
+            }}
+            className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-700 accent-indigo-600"
+          />
+          Tracked only
+        </label>
         <Select
           value={strength}
           onChange={(v) => setStrength(v as StrengthFilter)}
