@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { computeProgress, loadGoalsWithEntries } from "@/lib/goals-server";
+import { addEntry } from "@/lib/goals-actions";
 import { GoalsList, type GoalRow } from "../components/GoalsList";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +58,7 @@ export default async function GoalsPage() {
           <code className="text-xs">goal_entries</code> tables.
         </div>
       ) : (
-        <GoalsList rows={rows} today={today} />
+        <GoalsList rows={rows} today={today} addEntry={addEntry} />
       )}
     </div>
   );

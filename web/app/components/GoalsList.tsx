@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, Plus } from "lucide-react";
 import {
   CATEGORY_LABEL,
   GOAL_CATEGORIES,
@@ -14,13 +14,22 @@ import {
   type GoalCategory,
   type GoalProgress,
   type GoalStatus,
+  type Pace,
 } from "@/lib/goals";
 
 export type GoalRow = { goal: Goal; progress: GoalProgress; entryCount: number };
 
 type StatusFilter = GoalStatus | "all";
 
-export function GoalsList({ rows, today }: { rows: GoalRow[]; today: string }) {
+export function GoalsList({
+  rows,
+  today,
+  addEntry,
+}: {
+  rows: GoalRow[];
+  today: string;
+  addEntry: (goalId: string, fd: FormData) => Promise<void>;
+}) {
   const [status, setStatus] = useState<StatusFilter>("active");
   const [category, setCategory] = useState<GoalCategory | "all">("all");
 
@@ -30,14 +39,14 @@ export function GoalsList({ rows, today }: { rows: GoalRow[]; today: string }) {
     return c;
   }, [rows]);
 
+  const statusFiltered = useMemo(
+    () => rows.filter((r) => status === "all" || r.goal.status === status),
+    [rows, status],
+  );
+
   const filtered = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          (status === "all" || r.goal.status === status) &&
-          (category === "all" || r.goal.category === category),
-      ),
-    [rows, status, category],
+    () => statusFiltered.filter((r) => category === "all" || r.goal.category === category),
+    [statusFiltered, category],
   );
 
   const grouped = useMemo(() => {
@@ -89,6 +98,13 @@ export function GoalsList({ rows, today }: { rows: GoalRow[]; today: string }) {
         </select>
       </div>
 
+      <PaceSummary
+        rows={statusFiltered}
+        statusLabel={status === "all" ? "All" : STATUS_LABEL[status]}
+        category={category}
+        onCategory={setCategory}
+      />
+
       {endingSoon.length > 0 && (
         <div className="rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -123,7 +139,7 @@ export function GoalsList({ rows, today }: { rows: GoalRow[]; today: string }) {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {list.map((r) => (
-                  <GoalCard key={r.goal.id} row={r} today={today} />
+                  <GoalCard key={r.goal.id} row={r} today={today} addEntry={addEntry} />
                 ))}
               </div>
             </section>
@@ -134,7 +150,109 @@ export function GoalsList({ rows, today }: { rows: GoalRow[]; today: string }) {
   );
 }
 
-export function GoalCard({ row, today }: { row: GoalRow; today: string }) {
+/** Pace tallies for the current status tab: overall row + one row per category.
+ *  Clicking a category row filters the list to it; clicking again clears. */
+function PaceSummary({
+  rows,
+  statusLabel,
+  category,
+  onCategory,
+}: {
+  rows: GoalRow[];
+  statusLabel: string;
+  category: GoalCategory | "all";
+  onCategory: (c: GoalCategory | "all") => void;
+}) {
+  const tally = (list: GoalRow[]) => {
+    const t = { total: list.length, on_track: 0, at_risk: 0, off_track: 0, other: 0, achieved: 0 };
+    for (const r of list) {
+      const p = r.progress.pace;
+      if (p === "on_track") t.on_track++;
+      else if (p === "at_risk") t.at_risk++;
+      else if (p === "off_track" || p === "ended") t.off_track++;
+      else t.other++;
+      if (r.progress.achieved) t.achieved++;
+    }
+    return t;
+  };
+
+  const overall = tally(rows);
+  if (overall.total === 0) return null;
+
+  const line = (t: ReturnType<typeof tally>) => (
+    <div className="flex items-center gap-3 text-sm tabular-nums">
+      <span className="text-emerald-600 dark:text-emerald-400 font-medium">{t.on_track} on track</span>
+      <span className="text-amber-600 dark:text-amber-400 font-medium">{t.at_risk} at risk</span>
+      <span className="text-rose-600 dark:text-rose-400 font-medium">{t.off_track} off track</span>
+      {t.other > 0 && <span className="text-neutral-400">{t.other} not started</span>}
+    </div>
+  );
+
+  const bar = (t: ReturnType<typeof tally>) =>
+    t.total === 0 ? null : (
+      <div className="h-1.5 w-full rounded-full overflow-hidden flex bg-neutral-100 dark:bg-neutral-800">
+        <div className="bg-emerald-500" style={{ width: `${(100 * t.on_track) / t.total}%` }} />
+        <div className="bg-amber-500" style={{ width: `${(100 * t.at_risk) / t.total}%` }} />
+        <div className="bg-rose-500" style={{ width: `${(100 * t.off_track) / t.total}%` }} />
+      </div>
+    );
+
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">
+          {statusLabel} goals · <span className="tabular-nums">{overall.total}</span>
+          <span className="ml-2 text-xs text-neutral-500">
+            {Math.round((100 * overall.achieved) / overall.total)}% hit their target
+          </span>
+        </h2>
+        {line(overall)}
+      </div>
+      {bar(overall)}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 pt-1">
+        {GOAL_CATEGORIES.map((c) => {
+          const t = tally(rows.filter((r) => r.goal.category === c));
+          const selected = category === c;
+          return (
+            <button
+              key={c}
+              onClick={() => onCategory(selected ? "all" : c)}
+              disabled={t.total === 0}
+              className={`rounded-lg border p-2.5 text-left disabled:opacity-40 ${
+                selected
+                  ? "border-indigo-500 ring-1 ring-indigo-500"
+                  : "border-neutral-200 dark:border-neutral-800 hover:border-indigo-400 dark:hover:border-indigo-500"
+              }`}
+              title={t.total === 0 ? "No goals" : `Filter to ${CATEGORY_LABEL[c]}`}
+            >
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+                  {CATEGORY_LABEL[c]}
+                </span>
+                <span className="text-sm font-semibold tabular-nums">{t.total}</span>
+              </div>
+              <div className="mt-1.5">{bar(t)}</div>
+              <div className="mt-1 text-[11px] text-neutral-500 tabular-nums">
+                {t.total === 0 ? "—" : `${t.on_track}✓ · ${t.at_risk}⚠ · ${t.off_track}✗`}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function GoalCard({
+  row,
+  today,
+  addEntry,
+}: {
+  row: GoalRow;
+  today: string;
+  addEntry: (goalId: string, fd: FormData) => Promise<void>;
+}) {
   const { goal, progress: p } = row;
   const cls = paceClass(p.pace);
   const pct = Math.min(1, Math.max(0, p.fraction));
@@ -147,13 +265,15 @@ export function GoalCard({ row, today }: { row: GoalRow; today: string }) {
       : `${fmtNum(remaining, goal.unit)} to go`;
 
   return (
-    <Link
-      href={`/goals/${goal.id}`}
-      className="block rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 hover:border-indigo-400 dark:hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-    >
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 hover:border-indigo-400 dark:hover:border-indigo-500">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium truncate">{goal.title}</div>
+          <Link
+            href={`/goals/${goal.id}`}
+            className="font-medium truncate block hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none focus:underline"
+          >
+            {goal.title}
+          </Link>
           <div className="text-xs text-neutral-500">
             {goal.start_date} → {goal.end_date}
             {goal.status !== "active" && <> · {STATUS_LABEL[goal.status]}</>}
@@ -206,6 +326,71 @@ export function GoalCard({ row, today }: { row: GoalRow; today: string }) {
           <AlertTriangle className="w-3 h-3" /> deadline in {p.daysLeft === 0 ? "0 days" : `${p.daysLeft}d`}
         </div>
       )}
-    </Link>
+
+      {(goal.status === "active" || goal.status === "pending" || goal.status === "paused") && (
+        <QuickLog goal={goal} pace={p.pace} today={today} addEntry={addEntry} />
+      )}
+    </div>
+  );
+}
+
+/** Inline entry logging on the card: value + optional date, no page hop. */
+function QuickLog({
+  goal,
+  pace,
+  today,
+  addEntry,
+}: {
+  goal: Goal;
+  pace: Pace;
+  today: string;
+  addEntry: (goalId: string, fd: FormData) => Promise<void>;
+}) {
+  const [pending, start] = useTransition();
+  const [justLogged, setJustLogged] = useState(false);
+
+  return (
+    <form
+      action={(fd) =>
+        start(async () => {
+          await addEntry(goal.id, fd);
+          setJustLogged(true);
+          setTimeout(() => setJustLogged(false), 2500);
+        })
+      }
+      className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center gap-2"
+      onSubmit={(e) => e.stopPropagation()}
+    >
+      <input
+        name="value"
+        type="number"
+        step="any"
+        required
+        disabled={pending}
+        placeholder={goal.measure === "cumulative" ? `+${goal.unit ?? "amount"}` : goal.unit ?? "value"}
+        className="w-24 min-w-0 flex-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500"
+        aria-label={`Log ${goal.measure === "cumulative" ? "an increment" : "a reading"} for ${goal.title}`}
+      />
+      <input
+        name="entry_date"
+        type="date"
+        defaultValue={today}
+        required
+        disabled={pending}
+        className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-xs text-neutral-500 outline-none focus:border-indigo-500"
+        aria-label="Entry date"
+      />
+      <button
+        type="submit"
+        disabled={pending}
+        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-white disabled:opacity-50 ${
+          justLogged ? "bg-emerald-600" : "bg-indigo-600 hover:bg-indigo-500"
+        }`}
+        title={pace === "not_started" ? "Logs before the start date still count" : "Log entry"}
+      >
+        {justLogged ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        {justLogged ? "Logged" : "Log"}
+      </button>
+    </form>
   );
 }
