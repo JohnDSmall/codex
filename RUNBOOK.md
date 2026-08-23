@@ -1184,9 +1184,57 @@ that regression happened once during this session and this is the fix.
 
 ---
 
+## Goals
+
+**Built 2026-08-23; migration applied and historical import run the same day.**
+
+Routes: `/goals` (status filter, default **Active**; grouped by category, worst pace first),
+`/goals/new`, `/goals/[id]` (chart of actual vs. expected pace, log an entry, change status,
+delete), `/goals/[id]/edit`. Code: `web/lib/goals.ts` (pure types + math, shared with the client),
+`web/lib/goals-server.ts` (loaders), `web/lib/goals-actions.ts` (server actions),
+`web/app/components/Goal{sList,Detail,Form}.tsx`.
+
+**Model.** `goals` is the definition (title, category financial/professional/health/social/misc,
+status pending/active/paused/completed/deprecated, target, start_value, unit, start_date, end_date,
+free-form). `goal_entries` is the ledger: every logged increment is a dated, timestamped row. Current
+value is **derived, never stored**:
+
+- `measure = cumulative` (default): current = start_value + Σ entries ("+12 miles").
+- `measure = absolute`: current = newest entry ("187 lbs"). Pair with `direction = at_most` for weight.
+- Binary goals: target 1, log one entry of 1 when done.
+
+**Pace.** Expected value today is linear from start_value to target across the date range. ratio =
+progress made ÷ progress expected. **≥100% on track (green), 80–100% at risk (amber), <80% off track
+(red).** A goal that has met its target is on track regardless. Active goals whose end_date has passed
+are **auto-flipped to completed on page load** (DB + display). Active goals ending within 14 days get
+a "deadline coming up" flag on the card and a banner at the top of the list.
+
+**Historical import.** 44 annual goals (2022, 2023, 2024, 2025 H1) with 2,961 entries come from the
+"Life Trakker" Google Sheet (id `1hGqpJSJSrWNgoSdZKRsMkjzy7wyl1Nnly1ccXHe4KO0`): targets and
+monthly totals from the **Habit Tracker** tab, daily increments from **GoalRawDataInput** where the
+column mapping could be verified against the monthly totals (Miles Run=N, Workout days=E>0,
+Pushups=Q, Abs=R, Hours read=S/60, Reading days=S>0, Freelance=T/60, Bike=AL — the "Sorting Table"
+tab headers are offset by one column from N onward). Everything else (walked, routines/blocks, skill
+dev, meditate, cold showers, certs/projects/books) is imported as month-end totals. 2020/2021 have
+actuals but no targets and were skipped; 2025 H1 goals with target 0 were skipped. The data file is
+checked in at `web/scripts/data/life-trakker-goals.json`; the importer is idempotent (upsert on
+`legacy_key`, entries replaced per goal):
+
+```powershell
+cd "C:\Users\Cameron Corse\projects\codex\web"; node scripts/import-life-trakker-goals.mjs --dry-run
+cd "C:\Users\Cameron Corse\projects\codex\web"; node scripts/import-life-trakker-goals.mjs
+```
+
+It talks to PostgREST with plain `fetch` — the supabase-js realtime module refuses Node 20 scripts.
+
+⚠️ That workbook also has a **Passwords** tab in plain text. Nothing from it was read into the
+repo; move it to a password manager.
+
+---
+
 ## supabase — schema
 
-Eleven migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Twelve migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -1203,6 +1251,7 @@ Eleven migrations in `supabase/migrations/`. There is no local Supabase stack an
 | `20260808120000_income_type_company.sql` | ✅ applied 2026-08-08 |
 | `20260808140000_card_transactions.sql` | ✅ applied 2026-08-08 |
 | `20260808160000_skill_tags_competency.sql` | ✅ applied 2026-08-08 |
+| `20260823120000_goals.sql` | ✅ applied 2026-08-23 — import run same day (44 goals, 2,961 entries) |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
@@ -1341,7 +1390,13 @@ read back from the running app or straight from PostgREST. Every real bug this r
 3. **Turbopack picks the wrong workspace root.** A stray `package-lock.json` sits in `C:\Users\Cameron Corse\` (the home dir, outside the repo), so `npm run dev` warns:
    > We detected multiple lockfiles and selected the directory of `C:\Users\Cameron Corse\package-lock.json` as the root directory.
 
-   Harmless so far, but it can cause odd module resolution. Fix by deleting the stray home-dir lockfile (if nothing needs it) or setting `turbopack.root` in `web/next.config.ts` — currently that config is empty.
+   **NOT harmless (2026-08-22):** with the stray lockfile present, `next dev` (16.2.6/Turbopack) spawned a new
+   `.next/dev/build/postcss.js` worker roughly every second and never retired them — 735 node processes,
+   ~47 GB committed, two low-virtual-memory events and a hard reboot in one morning
+   (vercel/next.js#92978). Fix applied: moved `~/package.json`, `~/package-lock.json`, `~/node_modules`
+   (a stray `web-vitals` install) out of the home dir, set `turbopack.root` in `web/next.config.ts`,
+   cleared `web/.next`. Verified: 4 node processes, stable. If it recurs, `next dev --webpack` is the
+   escape hatch. Symptom to watch for: `Get-Process node` count climbing past ~10. Fix by deleting the stray home-dir lockfile (if nothing needs it) or setting `turbopack.root` in `web/next.config.ts` — currently that config is empty.
 
 4. **The two apps are unrelated and use different ports.** ephemeris = Flask on **5000**, SQLite, local-only, no auto-reload. web = Next on **3000**, Supabase, remote data, auto-reloads. They can run at the same time.
 
