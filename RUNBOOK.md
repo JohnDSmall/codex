@@ -1232,9 +1232,24 @@ repo; move it to a password manager.
 
 ---
 
+## Planner
+
+**Built 2026-08-30; migration applied same day.** A month calendar at `/planner`: ‹/Today/›
+navigation, click a day to add an activity (start prefilled), click a bar to edit or delete it.
+Activities are single rows in `planner_activities` with an inclusive `start_date`/`end_date`;
+multi-day blocks render as spanning bars that break across week rows ("…" marks a continuation)
+and stack into lanes when they overlap. Six categories drive the colors — work (sky),
+family_friends (violet), health (emerald), travel (amber), personal (pink), misc (neutral) — and
+the header legend doubles as a per-month tally. Code: `web/lib/planner.ts` (types + palette),
+`web/lib/planner-server.ts`, `web/lib/planner-actions.ts`,
+`web/app/components/PlannerCalendar.tsx`. Date math is done on ISO strings / UTC day numbers —
+no local-timezone Date parsing, which is what keeps SSR and client agreeing on "today".
+
+---
+
 ## supabase — schema
 
-Twelve migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Thirteen migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -1252,6 +1267,7 @@ Twelve migrations in `supabase/migrations/`. There is no local Supabase stack an
 | `20260808140000_card_transactions.sql` | ✅ applied 2026-08-08 |
 | `20260808160000_skill_tags_competency.sql` | ✅ applied 2026-08-08 |
 | `20260823120000_goals.sql` | ✅ applied 2026-08-23 — import run same day (44 goals, 2,961 entries) |
+| `20260830120000_planner.sql` | ✅ applied 2026-08-30 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.
