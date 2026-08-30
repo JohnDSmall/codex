@@ -1247,9 +1247,29 @@ no local-timezone Date parsing, which is what keeps SSR and client agreeing on "
 
 ---
 
+## Actions
+
+**Built 2026-08-30; migration applied same day.** A to-do ledger at `/actions` (sidebar: Actions).
+`action_items` carries a stable human ID (`seq`, identity — never reused), description, priority
+(high/medium/low), category (same six as the planner, same colors), active/completed status, an
+optional `due_date`, created_at (add date) and updated_at (last update — touched by EVERY change,
+notes included). `action_item_notes` is the open-ended dated note thread, any number per item,
+append-only from the UI; deleting an item cascades its notes.
+
+The dashboard is one list: quick-add bar on top (description + priority + category + optional due,
+one Enter); each row has inline selects to flip priority/category, an editable due date (red when
+overdue), a checkbox to close/reopen, and expands to the note thread. Open items sort by priority →
+due date → newest; the Completed tab sorts by most recently closed.
+
+**Planner tie-in:** `loadDueCounts()` (active items with a due_date) feeds "N due" badges on the
+/planner day cells — rose when the date is past, indigo upcoming — linking to `/actions`. Code:
+`web/lib/action-items{,-server,-actions}.ts`, `web/app/components/ActionItemsView.tsx`.
+
+---
+
 ## supabase — schema
 
-Thirteen migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
+Fourteen migrations in `supabase/migrations/`. There is no local Supabase stack and no `config.toml`, and
 **no CLI installed on this machine** — apply them by pasting into the SQL editor at
 `https://supabase.com/dashboard/project/qwkdjxzgqrnbzrohaekg/sql/new`.
 
@@ -1268,6 +1288,7 @@ Thirteen migrations in `supabase/migrations/`. There is no local Supabase stack 
 | `20260808160000_skill_tags_competency.sql` | ✅ applied 2026-08-08 |
 | `20260823120000_goals.sql` | ✅ applied 2026-08-23 — import run same day (44 goals, 2,961 entries) |
 | `20260830120000_planner.sql` | ✅ applied 2026-08-30 |
+| `20260830150000_action_items.sql` | ✅ applied 2026-08-30 |
 
 DDL cannot go through the REST API, so these always need the SQL editor (or the CLI, if installed later).
 All of them are written to be idempotent.

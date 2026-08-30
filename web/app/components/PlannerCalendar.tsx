@@ -88,12 +88,15 @@ type Draft = {
 
 export function PlannerCalendar({
   activities,
+  dueCounts = {},
   today,
   createActivity,
   updateActivity,
   deleteActivity,
 }: {
   activities: Activity[];
+  /** date -> count of open action items due that day (badge in the day cell). */
+  dueCounts?: Record<string, number>;
   today: string;
   createActivity: (fd: FormData) => Promise<void>;
   updateActivity: (id: string, fd: FormData) => Promise<void>;
@@ -204,8 +207,9 @@ export function PlannerCalendar({
                     const iso = toISO(n);
                     const inMonth = monthOf(iso).month === ym.month;
                     const isToday = n === todayNum;
+                    const due = dueCounts[iso] ?? 0;
                     return (
-                      <div key={n} className="px-1.5 pt-1.5 pb-0.5">
+                      <div key={n} className="px-1.5 pt-1.5 pb-0.5 flex items-center gap-1">
                         <span
                           className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs tabular-nums ${
                             isToday
@@ -217,6 +221,19 @@ export function PlannerCalendar({
                         >
                           {Number(iso.slice(8, 10))}
                         </span>
+                        {due > 0 && (
+                          <a
+                            href="/actions"
+                            title={`${due} action item${due === 1 ? "" : "s"} due ${iso}`}
+                            className={`pointer-events-auto rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums ${
+                              n < todayNum
+                                ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                                : "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                            }`}
+                          >
+                            {due} due
+                          </a>
+                        )}
                       </div>
                     );
                   })}

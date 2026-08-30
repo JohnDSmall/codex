@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CalendarDays,
+  ListTodo,
   Target,
   Users,
   FolderKanban,
@@ -19,6 +20,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon };
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/planner", label: "Planner", icon: CalendarDays },
+  { href: "/actions", label: "Actions", icon: ListTodo },
   { href: "/goals", label: "Goals", icon: Target },
   { href: "/relationships", label: "Relationships", icon: Users },
   { href: "/projects", label: "Projects", icon: FolderKanban },

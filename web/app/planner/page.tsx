@@ -1,11 +1,15 @@
 import { loadActivities } from "@/lib/planner-server";
+import { loadDueCounts } from "@/lib/action-items-server";
 import { createActivity, deleteActivity, updateActivity } from "@/lib/planner-actions";
 import { PlannerCalendar } from "../components/PlannerCalendar";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlannerPage() {
-  const { activities, tableMissing } = await loadActivities();
+  const [{ activities, tableMissing }, dueCounts] = await Promise.all([
+    loadActivities(),
+    loadDueCounts(),
+  ]);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -28,6 +32,7 @@ export default async function PlannerPage() {
       ) : (
         <PlannerCalendar
           activities={activities}
+          dueCounts={dueCounts}
           today={today}
           createActivity={createActivity}
           updateActivity={updateActivity}
