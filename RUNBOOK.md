@@ -1130,6 +1130,30 @@ Re-verified 2026-08-01: every account has exactly 5 readings (30 total), each ac
 equals its `current_value`, the six current values sum to $296,800, and all 8 history points reconcile
 under carry-forward.
 
+### Year-end backfill (2026-10-12)
+
+The user's year-end net-worth sheet (ages 24-27, 2022-2025) was imported with
+`web/scripts/import-year-end-wealth.mjs` from `web/scripts/data/year-end-wealth-2022-2025.json`.
+It is idempotent: accounts match on `wealth_items.name`, snapshots upsert on `(item_id, as_of_date)`,
+and a second run reports `added: 0`. Result: **14 accounts, 68 readings.**
+
+- **8 new accounts:** Snorkel Options (0), Misc Deloitte, Deloitte Cash Balance, Cash - USD,
+  Cash - EUR (converted to USD), Apparel, Other Personal Property, Shell Collection. The last three
+  use category `personal`. Furniture was skipped (blank in every year).
+- **2025-12-31 added to all 6 existing accounts.** The sheet's 2022-2024 values for Savings,
+  Checking, Portfolio, and "401K + Deloitte Cash" (= Vanguard 401k) already matched the existing
+  Dec-31 readings exactly, so nothing was replaced.
+- **Reconciliation:** 2025-12-31 net worth = **$285,283**, equal to the sheet. 2022-2024 are
+  **higher than the sheet by exactly the I-Bond reading** for that year (10,000 / 10,500 / 11,300):
+  the sheet leaves I-Bond blank before 2025, the DB had those values before the import. Left as-is.
+- Net worth after the import: 2022 $164,684 · 2023 $197,918 · 2024 $253,855 · 2025 $285,283 ·
+  2026-09-16 $361,527. The personal-property and Deloitte lines carry forward into 2026, which is
+  why the 2026 figure rose from $296,800.
+
+⚠️ **Importer env precedence.** Both `web/scripts/import-*.mjs` now let `.env.local` **override**
+the shell. The worklog tooling exports `SUPABASE_URL` for a different project machine-wide; before
+the fix, that URL was paired with the codex key and PostgREST answered `401 Invalid API key`.
+
 ### Why it was rebuilt
 
 `wealth_items` stores history as `eoy_values`, a jsonb map of `year -> value`: one snapshot per calendar
@@ -1458,6 +1482,11 @@ read back from the running app or straight from PostgREST. Every real bug this r
 ---
 
 ## Change log — 2026-10-12 session
+
+- **Wealth year-end backfill.** 8 new accounts, 30 new readings (2022-2025 Dec-31), reconciled to
+  the sheet. See [Year-end backfill](#year-end-backfill-2026-10-12).
+- **Importer env fix.** `.env.local` now wins over the shell in both `web/scripts/import-*.mjs`.
+- **PowerShell execution policy** set to RemoteSigned for CurrentUser (see Machine facts).
 
 - **Supabase retry wrapper** (`web/lib/retry-fetch.ts`, wired via `global.fetch` in
   `web/lib/supabase-server.ts`). Retries idempotent requests on transient gateway failures; refuses to

@@ -24,7 +24,9 @@ const dryRun = process.argv.includes("--dry-run");
 // Minimal .env.local reader — no dotenv dependency in this project.
 for (const line of readFileSync(join(here, "..", ".env.local"), "utf8").split(/\r?\n/)) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  // .env.local wins over the shell: other tooling on this machine exports a
+  // SUPABASE_URL for a different project, and a mismatched URL/key pair 401s.
+  if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_KEY;

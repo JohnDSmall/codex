@@ -1,0 +1,24 @@
+{
+  "source": "Year-end net worth sheet supplied by the user on 2026-10-12 (ages 24-27).",
+  "dates": { "2022": "2022-12-31", "2023": "2023-12-31", "2024": "2024-12-31", "2025": "2025-12-31" },
+  "accounts": [
+    { "sheet": "Savings",                 "name": "BA Savings",                          "category": "cash",       "source": "Bank of America", "values": { "2022": 88661, "2023": 90800, "2024": 103428, "2025": 18000 } },
+    { "sheet": "Checking",                "name": "BA Checking",                         "category": "cash",       "source": "Bank of America", "values": { "2022": 3661,  "2023": 5200,  "2024": 17248,  "2025": 11800 } },
+    { "sheet": "Personal Portfolio",      "name": "Charles Schwab Investment Portfolio", "category": "investment", "source": "Charles Schwab",  "values": { "2022": 25622, "2023": 35000, "2024": 47800,  "2025": 152790 } },
+    { "sheet": "I-Bond",                  "name": "I-Bond",                              "category": "investment", "source": "Treasury",        "values": { "2025": 11500 } },
+    { "sheet": "Snorkel Options",         "name": "Snorkel Options",                     "category": "investment", "source": "Snorkel",         "values": { "2025": 0 } },
+    { "sheet": "Misc Deloitte",           "name": "Misc Deloitte",                       "category": "other",      "source": "Deloitte",        "values": { "2022": 1700,  "2023": 1600,  "2024": 0,      "2025": 0 } },
+    { "sheet": "401K + Deloitte Cash",    "name": "Vanguard 401k",                       "category": "investment", "source": "Vanguard",        "values": { "2022": 20000, "2023": 39068, "2024": 42474,  "2025": 50272 } },
+    { "sheet": "Deloitte Cash (2024)",    "name": "Deloitte Cash Balance",               "category": "investment", "source": "Deloitte",        "values": { "2024": 15175, "2025": 15418 } },
+    { "sheet": "Fidelity (Snorkel) 401k", "name": "Fidelity 401k",                       "category": "investment", "source": "Fidelity",        "values": { "2025": 7784 } },
+    { "sheet": "Cash - USD",              "name": "Cash - USD",                          "category": "cash",       "source": null,              "values": { "2022": 40,    "2023": 150,   "2024": 230,    "2025": 230 } },
+    { "sheet": "Cash - Euro (converted)", "name": "Cash - EUR (converted to USD)",       "category": "cash",       "source": null,              "values": { "2025": 789 } },
+    { "sheet": "Apparel",                 "name": "Apparel",                             "category": "personal",   "source": null,              "values": { "2022": 5000,  "2023": 5500,  "2024": 6000,   "2025": 6500 } },
+    { "sheet": "Other",                   "name": "Other Personal Property",             "category": "personal",   "source": null,              "values": { "2022": 2000,  "2023": 2000,  "2024": 2000,   "2025": 2000 } },
+    { "sheet": "Shell Collection",        "name": "Shell Collection",                    "category": "personal",   "source": null,              "values": { "2022": 8000,  "2023": 8100,  "2024": 8200,   "2025": 8200 } }
+  ],
+  "skipped": [
+    "Furniture: no values in any year."
+  ],
+  "sheet_totals": { "2022": 154684, "2023": 187418, "2024": 242555, "2025": 285283 }
+}
