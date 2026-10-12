@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabase-server";
+import { GROUP_ORDER, LEGACY_PARENT, PARTNER_VENDOR, groupOf, isPartnerCharge } from "./rules";
 
 /* ------------------------------------------------------------------ types */
 
@@ -212,10 +213,16 @@ export async function loadTags(): Promise<Tag[]> {
   return (data ?? []) as Tag[];
 }
 
+/**
+ * Live buckets only. The old business-chart categories were parked under
+ * parent "Legacy" on 2026-10-12 (see lib/rules.ts); rows that still point at
+ * one keep their name, but nothing new should be filed there.
+ */
 export async function loadCategories(): Promise<Category[]> {
   const { data, error } = await supabaseAdmin
     .from("eph_categories")
     .select("id, parent, name")
+    .neq("parent", LEGACY_PARENT)
     .order("parent")
     .order("name");
   if (error) throw error;
@@ -375,6 +382,8 @@ export type CardTransaction = {
   merchant: string | null;
   amount: number;
   category_name: string | null;
+  /** Partner's share of a shared card, per lib/rules/partner-merchants.json. */
+  is_partner: boolean;
 };
 
 /**
@@ -411,15 +420,21 @@ export async function loadCardTransactions(opts: {
     throw error;
   }
   return {
-    rows: (data ?? []).map((r: Record<string, unknown>) => ({
-      id: String(r.id),
-      card: String(r.card),
-      date: String(r.date),
-      description: String(r.description ?? ""),
-      merchant: (r.merchant as string | null) ?? null,
-      amount: num(r.amount),
-      category_name: relName(r.category),
-    })),
+    rows: (data ?? []).map((r: Record<string, unknown>) => {
+      const card = String(r.card);
+      const merchant = (r.merchant as string | null) ?? null;
+      const description = String(r.description ?? "");
+      return {
+        id: String(r.id),
+        card,
+        date: String(r.date),
+        description,
+        merchant,
+        amount: num(r.amount),
+        category_name: relName(r.category),
+        is_partner: isPartnerCharge(card, merchant, description),
+      };
+    }),
     tableMissing: false,
   };
 }
@@ -525,6 +540,8 @@ export type DashboardData = {
   recentIncome: Income[];
   totalIncome: number;
   totalExpenses: number;
+  /** Expenses in range by bucket, with the bucket's roll-up group. */
+  byBucket: { bucket: string; group: string; total: number }[];
 };
 
 export async function loadDashboard(
@@ -591,7 +608,17 @@ export async function loadDashboard(
       return { month: m, income: inc, expenses: exp, net: inc - exp };
     });
 
+  const bucketMap = new Map<string, number>();
+  for (const e of expenses) {
+    const key = e.cat_name ?? "Uncategorized";
+    bucketMap.set(key, (bucketMap.get(key) ?? 0) + e.amount);
+  }
+  const byBucket = Array.from(bucketMap.entries())
+    .map(([bucket, total]) => ({ bucket, group: bucket === "Uncategorized" ? "Uncategorized" : groupOf(bucket), total }))
+    .sort((a, b) => b.total - a.total);
+
   return {
+    byBucket,
     totalsByTag,
     assetsTotal: assets.reduce((s, a) => s + a.value, 0),
     assetsByTag: Array.from(assetsByTagMap.entries())
@@ -620,10 +647,96 @@ export type SpendingData = {
   };
   byCard: { card: string; n: number; total: number }[];
   byCategory: { cat: string; total: number }[];
+  /** Buckets rolled up to Essentials / Lifestyle / Work / Other. */
+  byGroup: { group: string; total: number }[];
   byMonth: { month: string; total: number }[];
   topMerchants: { merchant: string; n: number; total: number }[];
+  /** Vendors with card payments allocated to the merchants behind them. */
+  vendors: VendorSpend;
   rows: Expense[];
 };
+
+export type VendorRow = { vendor: string; n: number; total: number; viaCard: number };
+export type VendorSpend = {
+  top: VendorRow[];
+  /** Card payments that had no charges on file to allocate against. */
+  unallocated: number;
+  partner: number;
+  total: number;
+};
+
+const isPaymentRow = (e: Expense): boolean => !!e.card && /card payment/i.test(e.description);
+
+/**
+ * Spend by vendor, with each card payment spread across the merchants on that
+ * card's previous-month statement in proportion to their charges — the same
+ * rule refresh.js uses for buckets. Direct bank debits count as their own
+ * merchant. Totals equal the expense total exactly, so nothing double-counts;
+ * partner charges roll up as one line so they do not inflate your vendors.
+ */
+export async function allocateVendors(rows: Expense[]): Promise<VendorSpend> {
+  const acc = new Map<string, VendorRow>();
+  const add = (vendor: string, amount: number, viaCard: boolean) => {
+    const v = acc.get(vendor) ?? { vendor, n: 0, total: 0, viaCard: 0 };
+    v.n += 1;
+    v.total += amount;
+    if (viaCard) v.viaCard += amount;
+    acc.set(vendor, v);
+  };
+
+  const payments = new Map<string, { card: string; month: string; total: number }>();
+  for (const r of rows) {
+    if (!isPaymentRow(r)) {
+      add(r.merchant || r.description, r.amount, false);
+      continue;
+    }
+    const k = `${r.date}|${r.card}`;
+    const p = payments.get(k) ?? { card: r.card!, month: statementMonthForPayment(r.date), total: 0 };
+    p.total += r.amount;
+    payments.set(k, p);
+  }
+
+  let unallocated = 0;
+  let partner = 0;
+  if (payments.size > 0) {
+    const months = [...new Set([...payments.values()].map((p) => p.month))].sort();
+    const start = `${months[0]}-01`;
+    const [ey, em] = months[months.length - 1].split("-").map(Number);
+    const end = new Date(Date.UTC(ey, em, 0)).toISOString().slice(0, 10);
+    const tx = await fetchAll<{ card: string; date: string; merchant: string | null; description: string; amount: number }>(() =>
+      supabaseAdmin
+        .from("eph_card_transactions")
+        .select("card,date,merchant,description,amount")
+        .gte("date", start)
+        .lte("date", end) as never,
+    );
+    const mix = new Map<string, Map<string, number>>();
+    for (const t of tx) {
+      const k = `${t.card}|${t.date.slice(0, 7)}`;
+      const vendor = isPartnerCharge(t.card, t.merchant, t.description) ? PARTNER_VENDOR : t.merchant || t.description;
+      const m = mix.get(k) ?? new Map<string, number>();
+      m.set(vendor, (m.get(vendor) ?? 0) + num(t.amount));
+      mix.set(k, m);
+    }
+    for (const p of payments.values()) {
+      const m = mix.get(`${p.card}|${p.month}`);
+      const base = m ? [...m.values()].reduce((s, v) => s + v, 0) : 0;
+      if (!m || base <= 0) {
+        unallocated += p.total;
+        add(`${p.card} payment (no charges on file)`, p.total, true);
+        continue;
+      }
+      for (const [vendor, amt] of m) {
+        const share = (p.total * amt) / base;
+        if (vendor === PARTNER_VENDOR) partner += share;
+        add(vendor, share, true);
+      }
+    }
+  }
+
+  const top = [...acc.values()].sort((a, b) => b.total - a.total).slice(0, 25);
+  return { top, unallocated, partner, total: rows.reduce((s, r) => s + r.amount, 0) };
+}
 
 export async function loadSpending(f: Filters): Promise<SpendingData> {
   const rows = await loadExpenses(f);
@@ -669,6 +782,14 @@ export async function loadSpending(f: Filters): Promise<SpendingData> {
     merchMap.set(key, cur);
   }
 
+  const groupMap = new Map<string, number>();
+  for (const [cat, total] of catMap) {
+    const g = cat === "Uncategorized" ? "Uncategorized" : groupOf(cat);
+    groupMap.set(g, (groupMap.get(g) ?? 0) + total);
+  }
+
+  const vendors = await allocateVendors(rows);
+
   return {
     kpi: {
       n: rows.length,
@@ -684,6 +805,10 @@ export async function loadSpending(f: Filters): Promise<SpendingData> {
     byCategory: Array.from(catMap.entries())
       .map(([cat, total]) => ({ cat, total }))
       .sort((a, b) => b.total - a.total),
+    byGroup: Array.from(groupMap.entries())
+      .map(([group, total]) => ({ group, total }))
+      .sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)),
+    vendors,
     byMonth: Array.from(monthMap.entries())
       .map(([month, total]) => ({ month, total }))
       .sort((a, b) => a.month.localeCompare(b.month)),

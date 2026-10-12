@@ -32,18 +32,21 @@ export default async function CardTransactionsPage({
   const card = one(sp.card);
   const month = one(sp.month);
   const q = one(sp.q);
+  const hidePartner = one(sp.partner) === "hide";
 
-  const [{ rows, tableMissing }, cards] = await Promise.all([
+  const [{ rows: allRows, tableMissing }, cards] = await Promise.all([
     loadCardTransactions({ card, month, q }),
     loadCardNames(),
   ]);
+  const partnerCount = allRows.filter((r) => r.is_partner).length;
+  const rows = hidePartner ? allRows.filter((r) => !r.is_partner) : allRows;
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const months = [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse();
 
   const href = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams();
-    const base: Record<string, string | null> = { card, month, q, ...patch };
+    const base: Record<string, string | null> = { card, month, q, partner: hidePartner ? "hide" : null, ...patch };
     for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
     const s = p.toString();
     return s ? `/ephemeris/cards?${s}` : "/ephemeris/cards";
@@ -102,6 +105,14 @@ export default async function CardTransactionsPage({
               {months.slice(0, 18).map((m) => (
                 <Link key={m} href={href({ month: m })} className={chip(month === m)}>{fmtMonth(m)}</Link>
               ))}
+            </div>
+          )}
+
+          {partnerCount > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-neutral-400">Partner charges ({partnerCount}):</span>
+              <Link href={href({ partner: null })} className={chip(!hidePartner)}>Show</Link>
+              <Link href={href({ partner: "hide" })} className={chip(hidePartner)}>Hide</Link>
             </div>
           )}
 
@@ -182,6 +193,11 @@ export default async function CardTransactionsPage({
                         <Td className="max-w-[22rem] truncate">
                           {/* full memo on hover: the merchant is a cleaned-up form of it */}
                           <span title={r.description}>{r.merchant || r.description}</span>
+                          {r.is_partner && (
+                            <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-pink-50 dark:bg-pink-500/10 text-pink-700 dark:text-pink-300">
+                              partner
+                            </span>
+                          )}
                         </Td>
                         <Td muted>{r.category_name ?? ""}</Td>
                         <Td right className="font-medium">{fmtMoneyExact(r.amount)}</Td>

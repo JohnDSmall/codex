@@ -68,6 +68,43 @@ export default async function EphemerisOverviewPage({
         <CashflowChart data={d.months} />
       </Card>
 
+      <Card
+        title={`Spending by bucket · ${label}`}
+        padded={false}
+        action={
+          <Link href="/ephemeris/spending?from=&to=" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+            Drill in
+          </Link>
+        }
+      >
+        {d.byBucket.length === 0 ? (
+          <div className="p-4"><Empty>No expenses in this period.</Empty></div>
+        ) : (
+          <TableWrap>
+            <table className="w-full text-sm">
+              <thead className="text-xs text-neutral-500">
+                <tr className="text-left">
+                  <Th>Bucket</Th>
+                  <Th>Group</Th>
+                  <Th right>Total</Th>
+                  <Th right>Share</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.byBucket.map((b) => (
+                  <tr key={b.bucket} className="border-t border-neutral-100 dark:border-neutral-800">
+                    <Td className={b.bucket === "Uncategorized" ? "text-amber-600 dark:text-amber-400" : ""}>{b.bucket}</Td>
+                    <Td muted>{b.group}</Td>
+                    <Td right className="font-medium">{fmtMoneyFull(b.total)}</Td>
+                    <Td right muted>{d.totalExpenses > 0 ? `${((100 * b.total) / d.totalExpenses).toFixed(0)}%` : ""}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card title="By life-area tag">
           <TagBars data={d.totalsByTag} />

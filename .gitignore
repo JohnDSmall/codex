@@ -21,3 +21,6 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# refresh.js pre-write backups (local only)
+ephemeris/backups/

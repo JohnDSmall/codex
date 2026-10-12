@@ -101,25 +101,25 @@ export default async function SpendingPage({
           )}
         </Card>
 
-        <Card title="Top merchants" padded={false}>
-          {data.topMerchants.length === 0 ? (
+        <Card title="By group" padded={false}>
+          {data.byGroup.length === 0 ? (
             <div className="p-4"><Empty>No data in this range.</Empty></div>
           ) : (
             <TableWrap>
               <table className="w-full text-sm">
                 <thead className="text-xs text-neutral-500">
                   <tr className="text-left">
-                    <Th>Merchant</Th>
-                    <Th right>Txns</Th>
+                    <Th>Group</Th>
                     <Th right>Total</Th>
+                    <Th right>Share</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.topMerchants.map((m) => (
-                    <tr key={m.merchant} className="border-t border-neutral-100 dark:border-neutral-800">
-                      <Td className="max-w-[18rem] truncate">{m.merchant}</Td>
-                      <Td right muted>{m.n}</Td>
-                      <Td right className="font-medium">{fmtMoneyFull(m.total)}</Td>
+                  {data.byGroup.map((g) => (
+                    <tr key={g.group} className="border-t border-neutral-100 dark:border-neutral-800">
+                      <Td className={g.group === "Uncategorized" ? "text-amber-600 dark:text-amber-400" : ""}>{g.group}</Td>
+                      <Td right className="font-medium">{fmtMoneyFull(g.total)}</Td>
+                      <Td right muted>{data.kpi.total > 0 ? `${((100 * g.total) / data.kpi.total).toFixed(0)}%` : ""}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -128,6 +128,57 @@ export default async function SpendingPage({
           )}
         </Card>
       </div>
+
+      <Card
+        title="Top vendors"
+        padded={false}
+        action={
+          <span className="text-xs text-neutral-500">
+            card payments allocated to the merchants on the prior month&apos;s statement
+          </span>
+        }
+      >
+        {data.vendors.top.length === 0 ? (
+          <div className="p-4"><Empty>No data in this range.</Empty></div>
+        ) : (
+          <>
+            <TableWrap>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-neutral-500">
+                  <tr className="text-left">
+                    <Th>Vendor</Th>
+                    <Th right>Txns</Th>
+                    <Th right>Via card</Th>
+                    <Th right>Total</Th>
+                    <Th right>Share</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.vendors.top.map((v) => (
+                    <tr key={v.vendor} className="border-t border-neutral-100 dark:border-neutral-800">
+                      <Td className="max-w-[22rem] truncate">{v.vendor}</Td>
+                      <Td right muted>{v.n}</Td>
+                      <Td right muted>{v.viaCard > 0 ? fmtMoneyFull(v.viaCard) : ""}</Td>
+                      <Td right className="font-medium">{fmtMoneyFull(v.total)}</Td>
+                      <Td right muted>{data.vendors.total > 0 ? `${((100 * v.total) / data.vendors.total).toFixed(1)}%` : ""}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+            <p className="px-4 py-2 text-xs text-neutral-500 border-t border-neutral-100 dark:border-neutral-800">
+              Vendor totals sum to the expense total: a card payment is spread across that card&apos;s
+              previous-month charges in proportion, the same rule the importer uses for buckets.
+              {data.vendors.unallocated > 0 && (
+                <> {fmtMoneyFull(data.vendors.unallocated)} of card payments had no charges on file and is shown as-is.</>
+              )}
+              {data.vendors.partner > 0 && (
+                <> {fmtMoneyFull(data.vendors.partner)} is the partner&apos;s share of the shared card.</>
+              )}
+            </p>
+          </>
+        )}
+      </Card>
 
       <Card
         title={`Transactions${data.rows.length >= 200 ? " (first 200)" : ""}`}

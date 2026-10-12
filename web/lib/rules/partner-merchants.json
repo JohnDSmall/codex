@@ -1,0 +1,5 @@
+{
+  "_comment": "Card charges whose cleaned merchant OR raw memo contains one of these substrings (case-insensitive) are flagged as the partner's share of the shared Amex. They stay in the card-detail view (marked) and the vendor view rolls them up as one 'Partner (shared card)' line, so your own vendors are not inflated. Payments still count in full, because the cash did leave your bank. Edit this list by hand; the web app and refresh.js both read it.",
+  "cards": ["Amex"],
+  "merchants": []
+}

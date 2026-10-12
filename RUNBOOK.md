@@ -208,7 +208,13 @@ There are two generations, and they write to **different databases**:
 | [`reconcile_income.js`](#reconciling-against-full-history-statements) | Node | **Supabase** | income, overlapping statements |
 | [`import_bofa_expenses.js`](#expenses--imported-from-the-bank-not-the-cards) | Node | **Supabase** | expenses |
 
-**Use the Node ones.** The Python pair write to `ephemeris.db`, which nothing reads any more — the web
+**Superseded 2026-10-12 — use `refresh.js` instead** (see [Expense refresh process](#expense-refresh-process)).
+It does what `import_bofa_expenses.js` and `import_card_transactions.js` did, in one idempotent run,
+with the rules in JSON rather than parsed out of Python. The two older Node importers still work but
+write the OLD business-chart categories; do not run them again. `import_bofa_income.js` /
+`reconcile_income.js` are unchanged and still the way to load income.
+
+**The Python pair** write to `ephemeris.db`, which nothing reads any more — the web
 app is backed by Supabase. They are kept because they hold `CATEGORY_RULES` and
 `normalize_merchant()`, which `import_bofa_expenses.js` parses at runtime, and because re-running the
 SQLite path would need a fresh export to reach the live app.
@@ -492,6 +498,109 @@ batch with. Add a rule when a name starts repeating, not before.
 - Amex statements run 2024-12-27 → 2026-07-18.
 - Everything imported is tagged `Personal`, including business-looking categories such as
   `F&O - Software & Apps`. These are personal accounts; re-tag if you want them split by life area.
+
+---
+
+## Expense refresh process
+
+Built 2026-10-12. One command, dry-run by default, idempotent — a second run reports zero changes.
+
+### Monthly routine
+
+1. Export the statements and drop them in **`C:\Users\Cameron Corse\Documents\Codex Statements\`**:
+   `bank\` (BofA checking + savings CSV; a file name containing "sav" is treated as savings), `amex\`
+   (Amex "activity" CSVs), `bofa-card\` (BofA card 7061 CSVs). Overlapping exports are fine; leave old
+   files in place.
+2. Dry run, then apply:
+
+   ```powershell
+   cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+   node refresh.js            # read-only: what would change, bucket totals, monthly series
+   node refresh.js --apply    # write
+   ```
+3. **Eyeball the monthly series** it prints. A wrong number is silent (the $90,000 lesson).
+4. Open `Codex Statements\review-uncategorized.csv` (largest unmatched merchants first). Fill the
+   `bucket` column for the ones that matter; shorten `match` if the memo is noisy. Then:
+
+   ```powershell
+   node refresh.js review-apply   # appends the rules to web/lib/rules/category-rules.json
+   node refresh.js --apply        # re-buckets history with the new rules
+   ```
+5. Commit `web/lib/rules/*.json` — the rules are the asset; the DB can always be rebuilt from them.
+
+### What refresh.js does
+
+1. Ensures the 12 buckets exist in `eph_categories` (`parent` = group) and parks the 45 old
+   business-chart categories under `parent = 'Legacy'`, which `loadCategories()` hides.
+2. Upserts card charges into `eph_card_transactions` (dedupe_key as before) and **re-applies the
+   rules to every charge already there**.
+3. Inserts new bank debits into `eph_expenses`. Direct spend: one row, bucket by rule. Card payment:
+   split across buckets by that card's **previous-month charge mix read from
+   `eph_card_transactions`** (old statement CSVs no longer need to be present). Internal CHK↔SAV and
+   brokerage transfers excluded, as before.
+4. **Re-buckets every existing direct expense** (rule first, then the legacy map in
+   `categories.json`) and **re-splits every existing card payment** from the current mix. Payment
+   groups are keyed by `(date, card)` and their rows replaced in place, so history always reflects
+   the current rules.
+5. Writes the review CSV and prints the monthly series.
+
+Before any write it saves every category_id it is about to change and every payment row it is about
+to replace to `ephemeris/backups/<timestamp>-refresh.json` (gitignored).
+
+Dedupe: direct rows on `(date, amount, description)`, payments on `(date, card)` with a total check.
+If a payment day's total differs between DB and statements it **warns and leaves it alone** rather than
+guessing.
+
+### The buckets
+
+12 personal buckets replace the business chart of accounts. Defined in
+`web/lib/rules/categories.json`, which also holds the legacy→bucket map used for the one-time
+conversion:
+
+| Group | Buckets |
+|---|---|
+| Essentials | Housing · Groceries · Transportation · Health · Taxes & Insurance |
+| Lifestyle | Dining · Travel · Shopping · Entertainment · Subscriptions |
+| Work | Software & AI Tools |
+| Other | Fees & Misc |
+
+Rules live in `web/lib/rules/category-rules.json`: ordered, case-insensitive substring matches on the
+raw memo, **first match wins**. Specific before generic — `UBER EATS` (Dining) is listed before `UBER`
+(Transportation); `AMAZON WEB` (Software) before `AMAZON` (Shopping); `DELTA DENTAL` (Taxes &
+Insurance) before `DELTA AIR` (Travel). Keep that order when adding rules.
+
+**Conversion result (2026-10-12):** 1,449 card charges and 269 direct expenses re-bucketed, 45 of 66
+card payments re-split. Uncategorized fell from ~$48k (F&O - Uncategorized $35.8k + null $12.2k) to
+**$19.6k**: $12.2k of card payments from before any statement exists (unfixable) plus $8.6k of card
+charges across 180 merchants with no rule — that is the review queue.
+
+`ephemeris/db.py` `DEFAULT_CATEGORIES` (the Flask seed) still lists the old chart. It only affects the
+legacy SQLite app; left alone.
+
+### Partner flag
+
+`web/lib/rules/partner-merchants.json` lists merchant substrings that are the partner's on the shared
+Amex. The web app and `refresh.js` read the same file. Flagged charges get a *partner* badge on
+`/ephemeris/cards` (with a Show/Hide toggle) and roll up as one line, **Partner (shared card)**, in the
+vendor view. Payments still count in full — the cash did leave the bank. **The list starts empty**;
+add the partner's regular merchants and the views update on reload, no re-import needed.
+
+### Vendor view
+
+`/ephemeris/spending` now has **Top vendors**: each card payment is spread across the merchants on that
+card's previous-month statement in proportion to their charges (`allocateVendors()` in
+`lib/ephemeris-server.ts`), direct bank debits count as themselves, and partner charges collapse into
+one line. **Vendor totals sum exactly to the expense total**, so this is the first view that shows
+CVS-level detail for card spend without double-counting. Payments with no charges on file appear as
+`<card> payment (no charges on file)`. The page also shows **By group** (Essentials / Lifestyle / Work /
+Other), and the overview has **Spending by bucket** for the selected period.
+
+No schema change was needed for any of this. (The Supabase MCP server on this machine is bound to the
+worklog project, not codex, so DDL would have meant the SQL editor; columns such as `is_partner` or
+`retired_at` would be cleaner but were not required.)
+
+**Gotcha:** PowerShell's `Invoke-RestMethod` is rejected by Supabase with "Forbidden use of secret API
+key in browser" — its User-Agent looks like a browser. Use `node` or `curl` for ad-hoc PostgREST reads.
 
 ---
 
@@ -1487,6 +1596,11 @@ read back from the running app or straight from PostgREST. Every real bug this r
 
 ## Change log — 2026-10-12 session
 
+- **Expense refresh process** (`ephemeris/refresh.js` + `ephemeris/lib/`): one idempotent command
+  replaces the two 2026-08-08 expense importers; 12 personal buckets replace the business chart;
+  rules moved to `web/lib/rules/*.json`; review-queue CSV + `review-apply`; partner flag; vendor view
+  on /spending; bucket roll-ups on /spending and the overview. Whole history re-bucketed and re-split.
+  See [Expense refresh process](#expense-refresh-process).
 - **Wealth year-end backfill.** 8 new accounts, 30 new readings (2022-2025 Dec-31), reconciled to
   the sheet. See [Year-end backfill](#year-end-backfill-2026-10-12).
 - **Schwab 2025-10-20 reading added** ($139,428) to close the savings-to-portfolio timing trough.
