@@ -102,6 +102,7 @@ you click around, start it yourself in your own terminal.**
 | Node / npm | v20.18.0 / 10.9.0 | required by `web/` |
 | git | 2.47.0.windows.2 | |
 | Shell | PowerShell 5.1 | no `&&` chaining — use `;` or `; if ($?) { ... }` |
+| Execution policy | CurrentUser = **RemoteSigned** (set 2026-10-12) | Windows default is Restricted, which blocks `npm.ps1` with "running scripts is disabled". If that error returns, re-run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or use `npm.cmd` to bypass the shim. |
 
 The ephemeris READMEs were rewritten on 2026-07-25 to use `python` and the correct local paths. (They previously said `py -m venv` and hardcoded `C:\Users\johna\OneDrive\Documents\IC\financials` from a different machine.) `web/README.md` is still stock `create-next-app` boilerplate — ignore it, and read `web/AGENTS.md` instead.
 
