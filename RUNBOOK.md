@@ -1444,6 +1444,24 @@ read back from the running app or straight from PostgREST. Every real bug this r
 9. **Deletes are immediate.** Every ephemeris `/…/delete` route hard-deletes on POST with no confirmation and no undo (no `confirm()` in any template).
 10. **`seed.py` is not a full backup.** Rows added through the UI or the importers are lost on a DB reset.
 11. **`contacts/` loaders write to the live remote Supabase DB** — unlike `seed.py`, a mistake there is not confined to this machine.
+12. **A web-app error page does not mean the write failed.** Supabase's gateway intermittently drops
+    connections ("Connection closed." / "Gateway Timeout"), which surfaces as a Next error page on a
+    Server Action — *after* the insert may already have committed. Seen 2026-09-12: creating a goal
+    "failed" but the row landed, and resubmitting created a duplicate. Check the list page (or the
+    table) for the row before retrying a write. **Mitigated 2026-10-12:** `web/lib/retry-fetch.ts`
+    wraps the Supabase client's fetch and retries gateway drops (network error, 502/503/504/522/524)
+    up to 3× with backoff — but **only** for reads, PATCH, DELETE, and upserts. A plain POST insert is
+    never retried, because the row may already be committed; it fails fast with a message saying so.
+    If you still see a duplicate, it came from a human resubmit, not the wrapper.
+
+---
+
+## Change log — 2026-10-12 session
+
+- **Supabase retry wrapper** (`web/lib/retry-fetch.ts`, wired via `global.fetch` in
+  `web/lib/supabase-server.ts`). Retries idempotent requests on transient gateway failures; refuses to
+  retry plain inserts (see Gotcha 12). Verified with a fake-fetch test (9 cases) plus tsc, eslint, and
+  five routes 200 against live Supabase. No migration.
 
 ---
 
