@@ -90,7 +90,11 @@ you click around, start it yourself in your own terminal.**
 > Savings was re-valued down on 2025-10-20 (103,428 → 11,800) but Schwab was not re-valued up until
 > 2025-11-13 (47,800 → 155,300). The money appears to leave one account 24 days before arriving in the
 > other, so net worth dips to $134,348 and recovers. Carry-forward is behaving correctly; the gap is in
-> when the readings were taken. Adding a Schwab snapshot at the real transfer date would close it.
+> when the readings were taken.
+>
+> **Closed 2026-10-12.** The user confirmed the savings went into the portfolio. A Schwab reading of
+> **$139,428** was added at **2025-10-20** (prior 47,800 + the 91,628 that left BA Savings that day).
+> The trough is gone; net worth on 2025-10-20 now reads $257,581.
 
 ---
 
@@ -1485,6 +1489,7 @@ read back from the running app or straight from PostgREST. Every real bug this r
 
 - **Wealth year-end backfill.** 8 new accounts, 30 new readings (2022-2025 Dec-31), reconciled to
   the sheet. See [Year-end backfill](#year-end-backfill-2026-10-12).
+- **Schwab 2025-10-20 reading added** ($139,428) to close the savings-to-portfolio timing trough.
 - **Importer env fix.** `.env.local` now wins over the shell in both `web/scripts/import-*.mjs`.
 - **PowerShell execution policy** set to RemoteSigned for CurrentUser (see Machine facts).
 
