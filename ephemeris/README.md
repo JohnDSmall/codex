@@ -23,7 +23,7 @@ Source of truth is `DEFAULT_TAGS` in `db.py`.
 ## First-time setup
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe seed.py     # creates ephemeris.db and imports freelance spreadsheet rows

@@ -9,7 +9,7 @@ Recent structural changes: company-logo resolution is now database-driven
 ([projects](#projects--edit-create-and-the-hoursrevenue-link)).
 
 - **Repo:** https://github.com/JohnDSmall/codex
-- **Local clone:** `C:\Users\Cameron Corse\projects\codex`
+- **Local clone:** `C:\Users\Cameron Corse\Workspace\products\codex\code\codex`
 
 | Component | Stack | Storage | Runs? |
 |---|---|---|---|
@@ -64,8 +64,8 @@ Project Settings → API when convenient and update the file. Project ref: `qwkd
 Restart with:
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\web";       npm run dev              # :3000
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"; .\.venv\Scripts\python.exe app.py   # :5000
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web";       npm run dev              # :3000
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"; .\.venv\Scripts\python.exe app.py   # :5000
 ```
 If port 3000 is stuck held by an orphaned process, see Gotcha 7.
 
@@ -119,7 +119,7 @@ The ephemeris READMEs were rewritten on 2026-07-25 to use `python` and the corre
 Cold start (first time, or after deleting `.venv`):
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt   # Flask 3.0.3
 .\.venv\Scripts\python.exe seed.py                              # creates ephemeris.db
@@ -129,7 +129,7 @@ python -m venv .venv
 Warm start (venv and DB already exist — the normal case):
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
 .\.venv\Scripts\python.exe app.py
 ```
 
@@ -264,7 +264,7 @@ because an FK cannot point at rows that don't exist.
 ### Running it
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
 node import_bofa_income.js <checking.csv> <savings.csv>            # dry run, writes nothing
 node import_bofa_income.js <checking.csv> <savings.csv> --apply
 ```
@@ -507,19 +507,21 @@ Built 2026-10-12. One command, dry-run by default, idempotent — a second run r
 
 ### Monthly routine
 
-1. Export the statements and drop them in **`C:\Users\Cameron Corse\Documents\Codex Statements\`**:
+1. Export the statements and drop them in **`C:\Users\Cameron Corse\Workspace\products\codex\data\statements\`**
+   (moved there from `Documents\Codex Statements` in the 2026-10-25 Workspace reorganization;
+   `refresh.js` looks in both):
    `bank\` (BofA checking + savings CSV; a file name containing "sav" is treated as savings), `amex\`
    (Amex "activity" CSVs), `bofa-card\` (BofA card 7061 CSVs). Overlapping exports are fine; leave old
    files in place.
 2. Dry run, then apply:
 
    ```powershell
-   cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+   cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
    node refresh.js            # read-only: what would change, bucket totals, monthly series
    node refresh.js --apply    # write
    ```
 3. **Eyeball the monthly series** it prints. A wrong number is silent (the $90,000 lesson).
-4. Open `Codex Statements\review-uncategorized.csv` (largest unmatched merchants first). Fill the
+4. Open `data\statements\review-uncategorized.csv` (largest unmatched merchants first). Fill the
    `bucket` column for the ones that matter; shorten `match` if the memo is noisy. Then:
 
    ```powershell
@@ -699,7 +701,7 @@ Run `migrate_normalize_merchants.py` after any change to `normalize_merchant()` 
 Next.js **16.2.6**, React **19.2.4**, Tailwind 4, Supabase for data. Runs on **http://localhost:3000**.
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\web"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web"
 npm install        # already done on this machine
 npm run dev
 ```
@@ -763,7 +765,7 @@ smoke test only covered static paths and so never exercised `/projects/[id]` or
 `/relationships/[id]`, the two places most likely to break.
 
 ```bash
-cd "C:\Users\Cameron Corse\projects\codex\web"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web"
 KEY=$(grep '^SUPABASE_SERVICE_KEY=' .env.local | cut -d= -f2- | tr -d '"'\''\r')
 URL=$(grep '^SUPABASE_URL=' .env.local | cut -d= -f2- | tr -d '"'\''\r')
 CID=$(curl -s "$URL/rest/v1/contacts?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
@@ -1160,7 +1162,7 @@ Three steps, in order. Steps 2 and 3 need your Supabase credentials.
 **2. Export the existing rows.**
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\ephemeris"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\ephemeris"
 $env:SUPABASE_URL = "https://<project-ref>.supabase.co"
 $env:SUPABASE_SERVICE_KEY = "<service-role key>"
 .\.venv\Scripts\python.exe export_to_supabase.py --dry-run   # preview, writes nothing
@@ -1174,7 +1176,7 @@ Idempotent — every row carries `legacy_id` (the old SQLite integer PK) and ups
 **3. Point the web app at Supabase.**
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\web"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web"
 Copy-Item .env.local.example .env.local   # then fill in both values
 npm run dev
 ```
@@ -1359,8 +1361,8 @@ checked in at `web/scripts/data/life-trakker-goals.json`; the importer is idempo
 `legacy_key`, entries replaced per goal):
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\web"; node scripts/import-life-trakker-goals.mjs --dry-run
-cd "C:\Users\Cameron Corse\projects\codex\web"; node scripts/import-life-trakker-goals.mjs
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web"; node scripts/import-life-trakker-goals.mjs --dry-run
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\web"; node scripts/import-life-trakker-goals.mjs
 ```
 
 It talks to PostgREST with plain `fetch` — the supabase-js realtime module refuses Node 20 scripts.
@@ -1461,7 +1463,7 @@ open the file and copy it by hand.
 Python scripts that migrate legacy data (iCloud vCard export, old AWS Lambda / DynamoDB JSON dumps) into Supabase. Separate venv from ephemeris.
 
 ```powershell
-cd "C:\Users\Cameron Corse\projects\codex\contacts"
+cd "C:\Users\Cameron Corse\Workspace\products\codex\code\codex\contacts"
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt   # vobject, requests, python-dateutil
 ```
@@ -1591,6 +1593,18 @@ read back from the running app or straight from PostgREST. Every real bug this r
     up to 3× with backoff — but **only** for reads, PATCH, DELETE, and upserts. A plain POST insert is
     never retried, because the row may already be committed; it fails fast with a message saying so.
     If you still see a duplicate, it came from a human resubmit, not the wrapper.
+13. **Every data page 500s with `Invalid API key` when the dev server is started from a Claude
+    session.** Next.js lets an existing shell variable override `.env.local`, and the Claude
+    settings env block exports `SUPABASE_URL` for the *worklog* project (ggydnqewnvrutzlzglyi). The
+    codex service key is then sent to the wrong project. Seen 2026-10-30. Your own terminal is not
+    affected — the variable is not in the PowerShell profile or the user/machine environment. From an
+    agent shell, clear it first:
+    `cmd /c "set SUPABASE_URL=&& set SUPABASE_SERVICE_KEY=&& npm run dev"`. The Node importers
+    already defend against this by letting `.env.local` win.
+14. **The repo moved on 2026-10-25.** It is now
+    `C:\Users\Cameron Corse\Workspace\products\codex\code\codex`; `projects\codex` no longer exists.
+    Statements moved to `Workspace\products\codex\data\statements`. Moves are logged with undo files
+    under `Workspace\_system\logs`.
 
 ---
 

@@ -6,7 +6,8 @@
  *   node refresh.js review-apply    # read the filled-in review CSV, add its rules, then re-run
  *
  * Reads every CSV under the statements folder (override with --statements <dir>):
- *   %USERPROFILE%\Documents\Codex Statements\{bank,amex,bofa-card}
+ *   Workspace\products\codex\data\statements\{bank,amex,bofa-card}
+ *   (falls back to %USERPROFILE%\Documents\Codex Statements on an older checkout)
  *
  * What it does, in order:
  *   1. Ensure the 12 buckets exist in eph_categories (parent = group) and park the
@@ -40,7 +41,14 @@ const argv = process.argv.slice(2);
 const APPLY = argv.includes("--apply");
 const MODE = argv.find((a) => !a.startsWith("--")) ?? "refresh";
 const argVal = (f) => { const i = argv.indexOf(f); return i === -1 ? null : argv[i + 1]; };
-const STATEMENTS = argVal("--statements") ?? path.join(os.homedir(), "Documents", "Codex Statements");
+// Statements live in the Workspace project's data folder since the 2026-10-25 reorganization
+// (Workspace\products\codex\data\statements, i.e. three levels above this repo). The old
+// Documents location is kept as a fallback for an older checkout.
+const STATEMENT_CANDIDATES = [
+  path.resolve(__dirname, "..", "..", "..", "data", "statements"),
+  path.join(os.homedir(), "Documents", "Codex Statements"),
+];
+const STATEMENTS = argVal("--statements") ?? STATEMENT_CANDIDATES.find((d) => fs.existsSync(d)) ?? STATEMENT_CANDIDATES[0];
 const REVIEW_CSV = path.join(STATEMENTS, "review-uncategorized.csv");
 const BACKUPS = path.join(__dirname, "backups");
 
